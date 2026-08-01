@@ -1,0 +1,23 @@
+# Machine-specific paths to external trees. See .env.example.
+.env
+
+# Scratch and logs.
+tmp/
+
+# Rust
+target/
+Cargo.lock
+
+# .NET (the Roslyn frontend)
+bin/
+obj/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Corpus database: regenerable by the ingest frontend
+rulesdb/*.db
+rulesdb/*.db-wal
+rulesdb/*.db-shm
