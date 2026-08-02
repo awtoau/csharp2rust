@@ -4,11 +4,19 @@ A general C#-to-Rust source translator: reads C# through Roslyn, emits Rust,
 driven by a reviewable database of mapping rules rather than by per-file
 hand-editing.
 
-**Status: name claimed, nothing built here yet.** The working implementation
-currently lives inside the `awto-renode-rs` project, which uses Renode's C#
-codebase (~448k lines) as its corpus. This repository is where the *generic*
-part is extracted to once the language mapping is separable from the
-project-specific idioms.
+**This is the home of the generic capability built in `awto-renode-rs`.** That
+project translates Renode's C# codebase (~448k lines) to Rust; everything it
+learns that is *not* about Renode belongs here. The split:
+
+| stays in `awto-renode-rs` | lives here |
+|---|---|
+| the Renode corpus and its `.repl` platform | Roslyn extraction — reading what the compiler exposes |
+| trace-replay oracle and the firmware under test | the C#-to-Rust language mapping, as data |
+| peripheral shapes, the register DSL, project idioms | the rule-database engine, tiering and metrics |
+
+**Status: name claimed, nothing built here yet.** The implementation still
+lives in `awto-renode-rs` and moves across once the language mapping separates
+cleanly from the project idioms.
 
 ## Why this exists
 
