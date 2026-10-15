@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -23,16 +24,17 @@ def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(argv, cwd=cwd, text=True, capture_output=True)
 
 
-def write_csharp_runner(case: Path, source: Path, type_name: str) -> None:
+def write_csharp_runner(case: Path, sources: list[Path], type_name: str) -> None:
     (case / "Case.csproj").write_text("""<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework></PropertyGroup>
 </Project>
 """)
-    shutil.copy2(source, case / source.name)
-    (case / "Xunit.cs").write_text(
+    for source in sources:
+        shutil.copy2(source, case / source.name)
+    (case / "ConformanceStubs.cs").write_text(
         "namespace Xunit { public sealed class FactAttribute : System.Attribute {} }\n"
         "public sealed class OuterLoopAttribute : System.Attribute {}\n")
-    (case / "Program.cs").write_text(
+    (case / "ConformanceRunner.cs").write_text(
         f"System.Console.WriteLine({type_name}.TestEntryPoint());\n")
 
 
@@ -69,7 +71,58 @@ def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
     case_name = relative_source.replace("/", "__").removesuffix(".cs")
     case = cases / case_name
     case.mkdir()
-    write_csharp_runner(case, source, type_name)
+    write_csharp_runner(case, [source], type_name)
+    csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
+    if csharp is None:
+        return relative_source, "source_failed", "C# entry point did not produce an integer"
+    emission = run([
+        sys.executable, str(EMITTER), "--db", str(db),
+        "--type", type_name, "--method", "TestEntryPoint", "--static-function",
+    ], ROOT)
+    if emission.returncode or not emission.stdout.strip():
+        return relative_source, "withheld", emission.stderr.strip() or "no emitted Rust"
+    write_rust_runner(case, emission.stdout)
+    rust = output_value(run(["cargo", "run", "--quiet"], case))
+    return relative_source, "agreed" if rust == csharp else "disagreed", ""
+
+
+def failure_reason(result: subprocess.CompletedProcess[str]) -> str:
+    output = (result.stderr or result.stdout).strip().splitlines()
+    return output[-1] if output else f"exit status {result.returncode}"
+
+
+def run_runtime_candidate(candidate: dict[str, str], tests: Path,
+                          cases: Path) -> tuple[str, str, str]:
+    relative_source = candidate["path"]
+    case = cases / relative_source.replace("/", "__").removesuffix(".cs")
+    sources = case / "sources"
+    sources.mkdir(parents=True)
+    source = tests / relative_source
+    staged_sources = []
+    for companion in sorted(source.parent.glob("*.cs")):
+        destination = sources / companion.name
+        shutil.copy2(companion, destination)
+        staged_sources.append(destination)
+    db = case / "corpus.db"
+    ingested = run([
+        "dotnet", "run", "--project", str(INGEST_PROJECT), "--",
+        "--source-dir", str(sources), "--source-name", "dotnet-runtime",
+        "--source-revision", "manifest", "--db", str(db), "-j", "32",
+    ], ROOT)
+    if ingested.returncode:
+        return relative_source, "ingest_failed", failure_reason(ingested)
+    con = sqlite3.connect(db)
+    entries = list(con.execute(
+        """SELECT t.name FROM type t JOIN member mb ON mb.type_id=t.id
+           JOIN method m ON m.member_id=mb.id
+           WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
+           ORDER BY t.name"""))
+    con.close()
+    if len(entries) != 1:
+        return relative_source, "ambiguous_entry", (
+            f"expected one ingested TestEntryPoint, found {len(entries)}")
+    type_name = entries[0][0]
+    write_csharp_runner(case, staged_sources, type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
     if csharp is None:
         return relative_source, "source_failed", "C# entry point did not produce an integer"
@@ -87,53 +140,75 @@ def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source-dir", type=Path)
+    ap.add_argument("--runtime-manifest", type=Path)
+    ap.add_argument("--report", type=Path)
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("-j", "--jobs", type=int, default=32)
     args = ap.parse_args()
 
     work = ROOT / "tmp" / "conformance"
     source_dir = args.source_dir or work / "generated"
+    if args.runtime_manifest and args.source_dir:
+        ap.error("--runtime-manifest and --source-dir are mutually exclusive")
     if args.source_dir is None:
-        generated = run([sys.executable, str(GENERATE)], ROOT)
-        if generated.returncode:
-            print(generated.stderr, file=sys.stderr)
-            return 1
+        if args.runtime_manifest is None:
+            generated = run([sys.executable, str(GENERATE)], ROOT)
+            if generated.returncode:
+                print(generated.stderr, file=sys.stderr)
+                return 1
+        else:
+            runtime = os.environ.get("DOTNET_RUNTIME_SRC")
+            if not runtime:
+                ap.error("DOTNET_RUNTIME_SRC must be set for --runtime-manifest")
+            manifest = json.loads(args.runtime_manifest.read_text())
+            source_dir = Path(runtime) / "src" / "tests"
 
-    db = work / "corpus.db"
-    ingested = run([
-        "dotnet", "run", "--project", str(INGEST_PROJECT), "--",
-        "--source-dir", str(source_dir), "--source-name", "conformance",
-        "--source-revision", "local", "--db", str(db), "-j", "32",
-    ], ROOT)
-    if ingested.returncode:
-        print(ingested.stdout + ingested.stderr, file=sys.stderr)
-        return 1
-
-    con = sqlite3.connect(db)
-    types = [row for row in con.execute(
-        """SELECT t.name, f.path FROM type t JOIN member mb ON mb.type_id=t.id
-           JOIN method m ON m.member_id=mb.id
-           JOIN file f ON f.id=t.file_id
-           WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
-           ORDER BY f.path, t.name""")]
-    con.close()
     cases = work / "cases"
     shutil.rmtree(cases, ignore_errors=True)
     cases.mkdir()
     if args.jobs < 1:
         ap.error("--jobs must be positive")
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        results = list(pool.map(
-            lambda entry: run_case(entry, source_dir, db, cases), types))
+        if args.runtime_manifest:
+            results = list(pool.map(
+                lambda candidate: run_runtime_candidate(candidate, source_dir, cases),
+                manifest["candidates"]))
+        else:
+            db = work / "corpus.db"
+            ingested = run([
+                "dotnet", "run", "--project", str(INGEST_PROJECT), "--",
+                "--source-dir", str(source_dir), "--source-name", "conformance",
+                "--source-revision", "local", "--db", str(db), "-j", "32",
+            ], ROOT)
+            if ingested.returncode:
+                print(ingested.stdout + ingested.stderr, file=sys.stderr)
+                return 1
+            con = sqlite3.connect(db)
+            types = [row for row in con.execute(
+                """SELECT t.name, f.path FROM type t JOIN member mb ON mb.type_id=t.id
+                   JOIN method m ON m.member_id=mb.id
+                   JOIN file f ON f.id=t.file_id
+                   WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
+                   ORDER BY f.path, t.name""")]
+            con.close()
+            results = list(pool.map(
+                lambda entry: run_case(entry, source_dir, db, cases), types))
     results.sort()
+    statuses = ("agreed", "disagreed", "withheld", "source_failed",
+                "ingest_failed", "ambiguous_entry")
     counts = {status: sum(1 for _name, found, _reason in results if found == status)
-              for status in ("agreed", "disagreed", "withheld", "source_failed")}
-    print(json.dumps({
-        "cases": len(types),
+              for status in statuses}
+    report = {
+        "cases": len(results),
         "emitted": counts["agreed"] + counts["disagreed"],
         **counts,
         "reasons": {name: reason for name, status, reason in results if reason},
-    }, sort_keys=True))
+    }
+    rendered = json.dumps(report, sort_keys=True)
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(rendered + "\n")
+    print(rendered)
     if not args.keep:
         shutil.rmtree(cases, ignore_errors=True)
     return 1 if counts["disagreed"] else 0
