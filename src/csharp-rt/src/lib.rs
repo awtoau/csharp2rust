@@ -38,13 +38,17 @@
 pub mod arith;
 pub mod collections;
 pub mod delegate;
+pub mod exception;
 mod gc;
 pub mod linq;
 
-pub use arith::{checked_add, checked_mul, checked_neg, checked_sub, shl, shr,
-                unchecked_add, unchecked_mul, unchecked_neg, unchecked_sub, CsInt};
+pub use arith::{
+    checked_add, checked_mul, checked_neg, checked_sub, shl, shr, unchecked_add, unchecked_mul,
+    unchecked_neg, unchecked_sub, CsInt,
+};
 pub use collections::dict_add;
 pub use delegate::combine_hook;
+pub use exception::{catch, is_type, rethrow, throw, CsException};
 pub use gc::{Collected, Gc, GcRaw, Heap, Trace, Tracer};
 pub use linq::{first, order_by, order_by_descending};
 
@@ -81,7 +85,11 @@ pub struct Array2D<T> {
 impl<T: Clone + Default> Array2D<T> {
     /// `new T[rows, cols]` — every slot initialised, as C# does.
     pub fn new(rows: usize, cols: usize) -> Self {
-        Self { data: vec![T::default(); rows * cols], rows, cols }
+        Self {
+            data: vec![T::default(); rows * cols],
+            rows,
+            cols,
+        }
     }
 }
 
@@ -107,8 +115,12 @@ impl<T> Array2D<T> {
     }
 
     fn offset(&self, row: usize, col: usize) -> usize {
-        assert!(row < self.rows && col < self.cols,
-                "index [{row}, {col}] out of bounds for {}x{}", self.rows, self.cols);
+        assert!(
+            row < self.rows && col < self.cols,
+            "index [{row}, {col}] out of bounds for {}x{}",
+            self.rows,
+            self.cols
+        );
         row * self.cols + col
     }
 
@@ -137,7 +149,11 @@ impl<T> Array2D<T> {
 impl<T: Clone + Default> Default for Array2D<T> {
     /// A zero-sized array, so a `#[derive(Default)]` state struct works.
     fn default() -> Self {
-        Self { data: Vec::new(), rows: 0, cols: 0 }
+        Self {
+            data: Vec::new(),
+            rows: 0,
+            cols: 0,
+        }
     }
 }
 
@@ -179,7 +195,10 @@ mod tests {
         a.set(1, 2, 42);
         assert_eq!(*a.get(1, 2), 42);
         // row-major: [1,2] is the last element
-        assert_eq!(a.iter().copied().collect::<Vec<_>>(), vec![0, 0, 0, 0, 0, 42]);
+        assert_eq!(
+            a.iter().copied().collect::<Vec<_>>(),
+            vec![0, 0, 0, 0, 0, 42]
+        );
     }
 
     #[test]
