@@ -16,6 +16,7 @@ the language layer.
 from __future__ import annotations
 
 import json
+import re
 
 from emitter.core import snake
 from emitter.plugins.register_dsl import to_const
@@ -35,7 +36,31 @@ class RenodeExpressions:
         if len(rest) == 1 and rest[0].startswith("format!(") and rest[0].endswith(")"):
             return [rest[0][len("format!("):-1]]
         if rest and not rest[0].startswith('"'):
-            return [f'"{{}}", {rest[0]}', *rest[1:]]
+            # Non-literal message expressions cannot carry Rust format slots,
+            # so forward just the expression through "{}". Any extra C#
+            # formatting operands are dropped here to keep Rust macro arity
+            # consistent (C# ignores unused operands in this shape too).
+            return [f'"{{}}", {rest[0]}']
+        if rest and rest[0].startswith('"'):
+            # Some logging call forms carry a format string whose indices were
+            # authored against a longer argument list than what reaches Rust
+            # after receiver/level stripping (e.g. only `{1}` remains with one
+            # argument). Shift all explicit indices down by the minimum one.
+            fmt = rest[0]
+            idxs = [int(m.group(1)) for m in re.finditer(r"\{(\d+)(:[^}]*)?\}", fmt)]
+            if idxs:
+                shift = min(idxs)
+                if shift > 0:
+                    fmt = re.sub(
+                        r"\{(\d+)(:[^}]*)?\}",
+                        lambda m: "{" + str(int(m.group(1)) - shift) + (m.group(2) or "") + "}",
+                        fmt,
+                    )
+                idxs = [int(m.group(1)) for m in re.finditer(r"\{(\d+)(:[^}]*)?\}", fmt)]
+                needed = (max(idxs) + 1) if idxs else 0
+                if needed > 0:
+                    return [fmt, *rest[1:1 + needed]]
+                return [fmt, *rest[1:]]
         return rest
 
     def plugin_expr(self, oid, kind, symbol, const, rtype, detail, kids, args, all_kids):
@@ -86,7 +111,10 @@ class RenodeExpressions:
             for i, k in enumerate(args):
                 env[f"arg{i}"] = self.emit_expr(k)
             try:
-                return rule["emit"].format(**env)
+                return self.annotate_fragment(
+                    rule["emit"].format(**env),
+                    f"rule:{rule['name']}"
+                )
             except KeyError:
                 self.unhandled[f"{rule['name']}:binding"] = 1
         rc = self.project.get("register_collection", {})
@@ -109,22 +137,33 @@ class RenodeExpressions:
             # arg 0 is still the peripheral receiver, arg 1+ is the message.
             vals = [self.emit_expr(a) for a in args]
             rest = self._log_message_args(vals[1:])
-            return logrule.get("emit", "log::{level}!({args})").format(
-                level=method_levels[mname], args=", ".join(rest))
+            return self.annotate_fragment(
+                logrule.get("emit", "log::{level}!({args})").format(
+                    level=method_levels[mname], args=", ".join(rest)),
+                "rule:project.logging.method_levels"
+            )
 
         if (kind == "Invocation" and symbol
                 and logrule.get("symbol_contains", "\0") in symbol):
-            # Renode's Log extension: (this, level, format, args...). It is
-            # STATIC, so arg 0 is the peripheral and arg 1 the level -- taking
-            # the arguments from the front would log at level "self".
+            # `Logger.Log(...)` has TWO overloads sharing this symbol prefix:
+            # the STATIC EXTENSION `(this, level, format, args...)`, where arg
+            # 0 is the peripheral and arg 1 the level -- and a plain static
+            # `(level, format, args...)` with no receiver at all. Telling them
+            # apart by argument COUNT is not safe (the plain form's own
+            # trailing format args make its count grow too), so this reads the
+            # first parameter's TYPE from the symbol instead: only the
+            # extension's first parameter is the receiver, never `LogLevel`.
+            first_param = symbol.split("(", 1)[1].rsplit(")", 1)[0].split(",")[0].strip()
+            has_receiver = not first_param.endswith("LogLevel")
+            level_idx = 1 if has_receiver else 0
             levels = logrule.get("levels", {})
             vals = [self.emit_expr(a) for a in args]
-            lvl, rest = logrule.get("default_level", "info"), vals[2:]
-            if len(vals) > 1:
+            lvl, rest = logrule.get("default_level", "info"), vals[level_idx + 1:]
+            if len(vals) > level_idx:
                 # The level is a FieldReference BELOW the Argument node, so the
                 # argument's own symbol is the parameter and never the level.
                 raw = ""
-                stack = [args[1]]
+                stack = [args[level_idx]]
                 while stack:
                     cur = stack.pop()
                     for cid, sym in self.con.execute(
@@ -138,8 +177,11 @@ class RenodeExpressions:
             # log! takes format arguments itself; a nested format!() is a
             # compile error (the macro needs a literal). See unwrap_format.
             rest = self._log_message_args(rest)
-            return logrule.get("emit", "log::{level}!({args})").format(
-                level=lvl, args=", ".join(rest))
+            return self.annotate_fragment(
+                logrule.get("emit", "log::{level}!({args})").format(
+                    level=lvl, args=", ".join(rest)),
+                "rule:project.logging.log"
+            )
 
         if kind == "Invocation" and symbol and self._current_type:
             # A call on `this` whose target is declared on a BASE type is
