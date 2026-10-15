@@ -33,8 +33,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_STORE = "/mnt/2tb/git_mirror/renode"
-
 
 def repo_root() -> Path:
     return Path(subprocess.run(["git", "rev-parse", "--show-toplevel"],
@@ -78,7 +76,7 @@ def main() -> int:
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tag", required=True, help="upstream tag to pin to, e.g. v1.17.0")
     ap.add_argument("--store", default=None,
-                     help=f"shared Renode mirror (default: $RENODE_STORE or {DEFAULT_STORE})")
+                     help=f"shared Renode mirror (default: $RENODE_STORE, then RENODE_STORE in .env)")
     ap.add_argument("--db", default=None,
                      help="output corpus db (default: tmp/patterns-<tag>.db, "
                           "NEVER rulesdb/patterns.db -- diff before replacing the canonical one)")
@@ -96,7 +94,11 @@ def main() -> int:
                    "diff the scratch db first (see issue #80)")
         return 1
 
-    store = Path(args.store or os.environ.get("RENODE_STORE") or DEFAULT_STORE)
+    store_s = args.store or os.environ.get("RENODE_STORE") or read_env(root, "RENODE_STORE")
+    if not store_s:
+        log.error("RENODE_STORE not set (--store, environment or .env; see .env.example)")
+        return 1
+    store = Path(store_s)
     if not (store / ".git").exists():
         log.error("not a git store: %s", store)
         return 1
