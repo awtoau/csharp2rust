@@ -40,5 +40,12 @@
       "thrown": "System.ArgumentException",
       "finally_thrown": "System.InvalidOperationException"
     }
+  ],
+  "multiple_catch_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "first_catch": "System.InvalidOperationException",
+      "second_catch": "System.ArgumentException"
+    }
   ]
 }

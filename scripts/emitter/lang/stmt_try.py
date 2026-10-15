@@ -27,49 +27,57 @@ def has_return(em, oid: int) -> bool:
 
 @core.stmt("Try")
 def try_stmt(em, oid: int, indent: int) -> list[str] | None:
-    """Emit the smallest proven catch shape; decline all other forms."""
+    """Emit proven typed catches; decline filters and complex control flow."""
     if not getattr(em, "_emitting_conformance", False):
         return None
     children = em.children(oid)
-    if (len(children) not in (2, 3)
-            or children[0][1] != "Block"
-            or children[1][1] != "CatchClause"
-            or (len(children) == 3 and children[2][1] != "Block")):
+    if len(children) < 2 or children[0][1] != "Block":
         return None
-    body_id, catch_id = children[0][0], children[1][0]
+    body_id = children[0][0]
+    catch_nodes = list(children[1:])
+    finally_id = None
+    if catch_nodes[-1][1] == "Block":
+        finally_id = catch_nodes.pop()[0]
+    if not catch_nodes or any(node[1] != "CatchClause" for node in catch_nodes):
+        return None
     if has_return(em, body_id):
         return None
-    row = em.con.execute(
-        "SELECT detail FROM operation WHERE id=?", (catch_id,)
-    ).fetchone()
-    try:
-        detail = json.loads(row[0]) if row and row[0] else {}
-    except json.JSONDecodeError:
-        return None
-    exception_type = detail.get("extype")
-    if detail.get("filter") or not isinstance(exception_type, str):
-        return None
-    catch_children = em.children(catch_id)
-    if len(catch_children) != 1 or catch_children[0][1] != "Block":
-        return None
-    catch_body_id = catch_children[0][0]
-    finally_id = children[2][0] if len(children) == 3 else None
+    catches: list[tuple[str, int]] = []
+    for catch_node in catch_nodes:
+        catch_id = catch_node[0]
+        row = em.con.execute(
+            "SELECT detail FROM operation WHERE id=?", (catch_id,)
+        ).fetchone()
+        try:
+            detail = json.loads(row[0]) if row and row[0] else {}
+        except json.JSONDecodeError:
+            return None
+        exception_type = detail.get("extype")
+        catch_children = em.children(catch_id)
+        if (detail.get("filter") or not isinstance(exception_type, str)
+                or len(catch_children) != 1 or catch_children[0][1] != "Block"):
+            return None
+        catches.append((exception_type, catch_children[0][0]))
     if finally_id is not None and (
-            has_return(em, catch_body_id) or has_return(em, finally_id)):
+            any(has_return(em, catch_body_id) for _, catch_body_id in catches)
+            or has_return(em, finally_id)):
         return None
     pad = "    " * indent
     body = em.emit_block(body_id, indent + 1)
-    previous_caught = getattr(em, "_caught_exception_name", None)
-    previous_finally_scope = getattr(em, "_catch_finally_scope", None)
-    em._caught_exception_name = "exception"
-    em._catch_finally_scope = (
-        (finally_id, catch_body_id) if finally_id is not None else None
-    )
-    try:
-        handler = em.emit_block(catch_body_id, indent + 1)
-    finally:
-        em._caught_exception_name = previous_caught
-        em._catch_finally_scope = previous_finally_scope
+    handlers: list[tuple[str, list[str]]] = []
+    for exception_type, catch_body_id in catches:
+        previous_caught = getattr(em, "_caught_exception_name", None)
+        previous_finally_scope = getattr(em, "_catch_finally_scope", None)
+        em._caught_exception_name = "exception"
+        em._catch_finally_scope = (
+            (finally_id, catch_body_id) if finally_id is not None else None
+        )
+        try:
+            handler = em.emit_block(catch_body_id, indent + 1)
+        finally:
+            em._caught_exception_name = previous_caught
+            em._catch_finally_scope = previous_finally_scope
+        handlers.append((exception_type, handler))
     final_after = em.emit_block(finally_id, indent) if finally_id is not None else []
     final_before_rethrow = (
         em.emit_block(finally_id, indent + 2) if finally_id is not None else []
@@ -81,9 +89,15 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
         f"{pad}}});",
         f"{pad}match managed_exception {{",
         f"{pad}    Ok(()) => {{}},",
-        f'{pad}    Err(exception) if csharp_rt::is_type(&exception, "{exception_type}") => {{',
-        *handler,
-        f"{pad}    }},",
+        *[
+            line
+            for exception_type, handler in handlers
+            for line in (
+                f'{pad}    Err(exception) if csharp_rt::is_type(&exception, "{exception_type}") => {{',
+                *handler,
+                f"{pad}    }},",
+            )
+        ],
         f"{pad}    Err(exception) => {{",
         *final_before_rethrow,
         f"{pad}        csharp_rt::rethrow(exception);",

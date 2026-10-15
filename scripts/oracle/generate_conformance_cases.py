@@ -216,6 +216,34 @@ public static class {name}
 """
 
 
+def multiple_catch_program(
+        name: str, thrown_exception_type: str, first_catch_type: str,
+        second_catch_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        try
+        {{
+            throw new {thrown_exception_type}("conformance");
+        }}
+        catch ({first_catch_type})
+        {{
+            return 101;
+        }}
+        catch ({second_catch_type})
+        {{
+            return 100;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -267,6 +295,14 @@ def main() -> int:
                 f"FinallyReplaces_{index}",
                 case["thrown"],
                 case["finally_thrown"],
+            ))
+    for index, case in enumerate(catalog["multiple_catch_exception_types"]):
+        (OUT / f"MultipleCatch_{index}.cs").write_text(
+            multiple_catch_program(
+                f"MultipleCatch_{index}",
+                case["thrown"],
+                case["first_catch"],
+                case["second_catch"],
             ))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
