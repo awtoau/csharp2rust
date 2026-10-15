@@ -85,20 +85,24 @@ pub struct Fields {
     pub dma_reception_request: FlagId,
 }
 
-/// C# `enum OversamplingMode`, discriminants as declared.
+/// C# `enum StopBitsValues`, discriminants as declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u64)]
-pub enum OversamplingMode {
-    #[default] By16 = 0,
-    By8 = 1,
+pub enum StopBitsValues {
+    #[default] One = 0,
+    Half = 1,
+    Two = 2,
+    OneAndAHalf = 3,
 }
 
 // WARN(narrowed): a value outside the declared set has no variant here: the source keeps the number, this falls back to the default.
-impl OversamplingMode {
+impl StopBitsValues {
     pub fn from_u64(v: u64) -> Self {
         match v {
-            0 => Self::By16,
-            1 => Self::By8,
+            0 => Self::One,
+            1 => Self::Half,
+            2 => Self::Two,
+            3 => Self::OneAndAHalf,
             _ => Self::default(),
         }
     }
@@ -123,24 +127,20 @@ impl ParitySelection {
     }
 }
 
-/// C# `enum StopBitsValues`, discriminants as declared.
+/// C# `enum OversamplingMode`, discriminants as declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u64)]
-pub enum StopBitsValues {
-    #[default] One = 0,
-    Half = 1,
-    Two = 2,
-    OneAndAHalf = 3,
+pub enum OversamplingMode {
+    #[default] By16 = 0,
+    By8 = 1,
 }
 
 // WARN(narrowed): a value outside the declared set has no variant here: the source keeps the number, this falls back to the default.
-impl StopBitsValues {
+impl OversamplingMode {
     pub fn from_u64(v: u64) -> Self {
         match v {
-            0 => Self::One,
-            1 => Self::Half,
-            2 => Self::Two,
-            3 => Self::OneAndAHalf,
+            0 => Self::By16,
+            1 => Self::By8,
             _ => Self::default(),
         }
     }

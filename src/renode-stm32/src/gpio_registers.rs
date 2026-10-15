@@ -80,31 +80,6 @@ pub mod reg {
 pub struct Fields {
 }
 
-/// C# `enum LockSequence`, discriminants as declared.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[repr(u64)]
-pub enum LockSequence {
-    #[default] Idle = 0,
-    Step0 = 1,
-    Step1 = 2,
-    Step2 = 3,
-    Armed = 4,
-}
-
-// WARN(narrowed): a value outside the declared set has no variant here: the source keeps the number, this falls back to the default.
-impl LockSequence {
-    pub fn from_u64(v: u64) -> Self {
-        match v {
-            0 => Self::Idle,
-            1 => Self::Step0,
-            2 => Self::Step1,
-            3 => Self::Step2,
-            4 => Self::Armed,
-            _ => Self::default(),
-        }
-    }
-}
-
 /// C# `enum Mode`, discriminants as declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(u64)]
@@ -146,6 +121,31 @@ impl OutputSpeed {
             1 => Self::Medium,
             2 => Self::Low2,
             3 => Self::High,
+            _ => Self::default(),
+        }
+    }
+}
+
+/// C# `enum LockSequence`, discriminants as declared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(u64)]
+pub enum LockSequence {
+    #[default] Idle = 0,
+    Step0 = 1,
+    Step1 = 2,
+    Step2 = 3,
+    Armed = 4,
+}
+
+// WARN(narrowed): a value outside the declared set has no variant here: the source keeps the number, this falls back to the default.
+impl LockSequence {
+    pub fn from_u64(v: u64) -> Self {
+        match v {
+            0 => Self::Idle,
+            1 => Self::Step0,
+            2 => Self::Step1,
+            3 => Self::Step2,
+            4 => Self::Armed,
             _ => Self::default(),
         }
     }
@@ -229,7 +229,7 @@ pub fn check_pin_number(bank: &Bank<State>, st: &mut State, number: i32) -> bool
 
 pub fn guard_pin_action(bank: &Bank<State>, st: &mut State, number: i32, name: String, action: Option<Box<dyn FnMut()>>) -> () {
     if ((st.lock_sequence_state == LockSequence::Armed as u64) && bithelper::is_bit_set(st.locked_pins, (number as u8))) {
-        log::warn!("Ignoring attempt to change {} configuration of the locked pin #{}", name, number);
+        log::warn!("Ignoring attempt to change {0} configuration of the locked pin #{1}", name, number);
         return;
     }
     if let Some(f) = action.as_mut() { f() };

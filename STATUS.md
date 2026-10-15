@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T19:31:42+11:00 from `6df3437` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-15T19:56:28+11:00 from `ea6d9b2` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -10,7 +10,7 @@ averaged 1.87 validation instances each.
 
 | metric | value | target | status |
 |---|---:|---:|---|
-| **compile-clean modules (the gate)** | 695 | ratchet, may only grow | PASS |
+| **compile-clean modules (the gate)** | 392 | ratchet, may only grow | PASS |
 | platform floor (peripherals reachable end-to-end) | 48 / 65 | 65 | 74% |
 | modules clean *and* drivable | 298 / 687 | — | 43% |
 | oracle trace replay: peripherals at 0 divergence | 3 / 8 | 8 | partial |
@@ -49,8 +49,8 @@ averaged 1.87 validation instances each.
 
 | file | size |
 |---|---:|
-| `rulesdb/rules/csharp_core.json` | 70,310 bytes |
-| `rulesdb/rules/register_dsl.json` | 64,253 bytes |
+| `rulesdb/rules/csharp_core.json` | 70,341 bytes |
+| `rulesdb/rules/register_dsl.json` | 64,228 bytes |
 | `rulesdb/rules/bug_rules.json` | 25,985 bytes |
 | `rulesdb/rules/offset_switch.json` | 13,460 bytes |
 | `rulesdb/rules/constructor.json` | 8,226 bytes |
@@ -99,7 +99,7 @@ Genuine stop points. A failed gate means stop, not retry.
 
 | gate | status | evidence |
 |---|---|---|
-| **two-tier compile gate** — modules with 0 rustc errors | 695 (ratchet, may only grow) | [docs/decisions/two-tier-compile-gate.md](docs/decisions/two-tier-compile-gate.md) |
+| **two-tier compile gate** — modules with 0 rustc errors | 392 (ratchet, may only grow) | [docs/decisions/two-tier-compile-gate.md](docs/decisions/two-tier-compile-gate.md) |
 | **the floor that runs** — peripherals reachable end-to-end | 48 / 65 | [docs/decisions/the-floor-that-runs.md](docs/decisions/the-floor-that-runs.md) |
 
 ### Historical (Phase 0/1)
@@ -236,11 +236,11 @@ hybrid host was ~50% from core migration; pinned it is ±2%.
 
 ## Issues
 
-38 open, 47 closed, 85 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
+39 open, 47 closed, 86 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
 
 | phase | open | closed |
 |---|---:|---:|
-| unphased | 38 | 47 |
+| unphased | 39 | 47 |
 
 **By label** (an issue may carry more than one; counts are not additive to the total above):
 

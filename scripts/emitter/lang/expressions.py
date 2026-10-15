@@ -37,6 +37,18 @@ from emitter import core
 from emitter.core import snake
 
 
+def drop_unused_trailing_args(rest: list[str]) -> list[str]:
+    """Remove only C# format arguments after the highest referenced index."""
+    if len(rest) < 2 or not rest[0].startswith('"'):
+        return rest
+    if "{" not in rest[0]:
+        return rest[:1]
+    used = {int(index) for index in re.findall(r"\{(\d+)(?::[^}]*)?\}", rest[0])}
+    if not used:
+        return rest
+    return rest[:max(used) + 2]
+
+
 class Expressions:
     """Mixin: expression emission."""
 
@@ -53,6 +65,16 @@ class Expressions:
         of them claims it -- so a construct is added by adding a FILE, and
         nothing that already works is touched.
         """
+        previous_position = getattr(self, "_stmt_position", False)
+        self._stmt_position = (
+            previous_position and getattr(self, "_stmt_oid", None) == oid)
+        try:
+            return self._emit_expr(oid)
+        finally:
+            self._stmt_position = previous_position
+
+    def _emit_expr(self, oid: int) -> str:
+        """Emit an expression with statement status scoped to its root node."""
         row = self.con.execute(
             "SELECT kind, symbol, const_value, detail, type FROM operation WHERE id=?",
             (oid,)).fetchone()
@@ -137,7 +159,7 @@ class Expressions:
             receiver=self.emit_expr(rid), name=name)
 
     def csharp_format(self, text: str) -> str:
-        """C# composite format to Rust. `{0:X}` -> `{:X}`, `{1:X8}` -> `{:08X}`.
+        """C# composite format to Rust. `{0:X}` -> `{0:X}`, `{1:X8}` -> `{1:08X}`.
 
         Passing the C# form through is a compile ERROR, not a wrong string:
         rustc reports `invalid format string: expected }, found 8`."""
@@ -145,15 +167,17 @@ class Expressions:
         table = spec.get("specs", {})
 
         def one(m):
+            index = m.group(1)
             fmt = m.group(2) or ""
             if not fmt:
-                return "{}"
+                return "{" + index + "}"
             kind, digits = fmt[0], fmt[1:]
             mapped = table.get(kind, kind)
             if digits.isdigit() and mapped:
-                return "{:" + spec.get("padded_hex", "0{width}{spec}").format(
-                    width=digits, spec=mapped) + "}"
-            return "{:" + mapped + "}" if mapped else "{}"
+                return "{" + index + ":" + spec.get(
+                    "padded_hex", "0{width}{spec}").format(
+                        width=digits, spec=mapped) + "}"
+            return "{" + index + ":" + mapped + "}" if mapped else "{" + index + "}"
 
         return re.sub(r"\{(\d+)(?::([^}]*))?\}", one, text)
 
@@ -213,4 +237,3 @@ class Expressions:
             if inner:
                 return inner
         return None
-

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 
 from emitter.core import snake
+from emitter.lang.expressions import drop_unused_trailing_args
 from emitter.plugins.register_dsl import to_const
 
 
@@ -36,7 +37,7 @@ class RenodeExpressions:
             return [rest[0][len("format!("):-1]]
         if rest and not rest[0].startswith('"'):
             return [f'"{{}}", {rest[0]}', *rest[1:]]
-        return rest
+        return drop_unused_trailing_args(rest)
 
     def plugin_expr(self, oid, kind, symbol, const, rtype, detail, kids, args, all_kids):
         """Corpus idioms. Returns Rust, or None to fall through."""

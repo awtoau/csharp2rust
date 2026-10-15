@@ -39,8 +39,11 @@ def expression_stmt(em, oid: int, indent: int) -> list[str]:
             "Increment", "Decrement", "CompoundAssignment"):
         return em.emit_stmt(kids[0][0], indent)
     prev_pos = getattr(em, "_stmt_position", False)
+    prev_oid = getattr(em, "_stmt_oid", None)
     em._stmt_position = True
+    em._stmt_oid = kids[0][0]
     try:
         return [pad + em.emit_expr(kids[0][0]) + ";"]
     finally:
         em._stmt_position = prev_pos
+        em._stmt_oid = prev_oid

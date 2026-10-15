@@ -249,7 +249,7 @@ pub fn basic_double_word_peripheral_reset(bank: &Bank<State>, st: &mut State) ->
 
 pub fn on_gpio(bank: &Bank<State>, st: &mut State, number: i32, value: bool) -> () {
     if ((number < 0) || (number >= st.streams.len())) {
-        log::warn!("Attempted to signal DMA stream {}. Maximum value is {}", number, csharp_rt::unchecked_sub(st.streams.len(), 1));
+        log::warn!("Attempted to signal DMA stream {0}. Maximum value is {1}", number, csharp_rt::unchecked_sub(st.streams.len(), 1));
         return;
     }
     st.streams[number as usize].on_gpio(value);

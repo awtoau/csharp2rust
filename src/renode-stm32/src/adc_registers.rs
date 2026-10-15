@@ -114,7 +114,7 @@ fn regular_sequence1_20_writer(bank: &Bank<State>, st: &mut State, _idx: usize, 
 }
 
 fn regular_data_0_provider(bank: &Bank<State>, st: &mut State, _idx: usize, _current: u64) -> u64 {
-    log::debug!("Reading ADC data {}", st.adc_data);
+    log::debug!("Reading ADC data {0}", st.adc_data);
     bank.set_flag(st.f.end_of_conversion, false);
     st.irq = false;
     return (st.adc_data as u64);

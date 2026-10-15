@@ -962,9 +962,17 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         # Keyed on the type's ID, never its name: the corpus holds many types
         # called `Registers` and two called `Mode`, and matching by name merged
         # all of them into one enum with duplicate discriminants.
+        seen: set[str] = set()
         for tid, ename in self.con.execute(
                 "SELECT t.id, t.name FROM type t WHERE t.kind='enum' "
-                "AND t.key LIKE ? ORDER BY t.name", (f"%.{type_name}.%",)):
+                "AND t.key LIKE ? ORDER BY LENGTH(t.key), t.key",
+                (f"%.{type_name}.%",)):
+            if ename in seen:
+                    self.log.warning(
+                        "%s: skipping nested enum `%s` with duplicate flat Rust name",
+                        type_name, ename)
+                    continue
+            seen.add(ename)
             members = self.con.execute(
                 "SELECT mb.name, mb.const_value FROM member mb "
                 "WHERE mb.type_id=? AND mb.const_value IS NOT NULL "
@@ -1127,6 +1135,22 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
     def fn_name(self, method_name: str) -> str:
         """Emitted function name. Property accessors lose their get_/set_ prefix
         so they match the PropertyReference call sites."""
+        if "." in method_name:
+            # Only explicit interface implementations have dotted C# member
+            # names. Keep the interface and member suffix so two interfaces
+            # implementing the same member remain distinct Rust functions.
+            segments, start, depth = [], 0, 0
+            for index, char in enumerate(method_name):
+                if char == "<":
+                    depth += 1
+                elif char == ">":
+                    depth -= 1
+                elif char == "." and depth == 0:
+                    segments.append(method_name[start:index])
+                    start = index + 1
+            segments.append(method_name[start:])
+            method_name = re.sub(r"[^A-Za-z0-9_]", "_",
+                                 "_".join(segments[-2:]))
         for pre in (self.project.get("peripheral_methods", {})
                     .get("accessor_names", {}).get("strip_prefixes", [])):
             if method_name.startswith(pre):
