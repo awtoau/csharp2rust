@@ -183,6 +183,39 @@ public static class {name}
 """
 
 
+def finally_replaces_exception_program(
+        name: str, thrown_exception_type: str, finally_exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        try
+        {{
+            try
+            {{
+                throw new {thrown_exception_type}("conformance");
+            }}
+            catch (System.InvalidOperationException)
+            {{
+            }}
+            finally
+            {{
+                throw new {finally_exception_type}("finally");
+            }}
+        }}
+        catch ({finally_exception_type})
+        {{
+            return 100;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -228,6 +261,13 @@ def main() -> int:
     for index, exception_type in enumerate(catalog["rethrow_finally_exception_types"]):
         (OUT / f"FinallyRethrow_{index}.cs").write_text(
             rethrowing_finally_program(f"FinallyRethrow_{index}", exception_type))
+    for index, case in enumerate(catalog["finally_replaces_exception_types"]):
+        (OUT / f"FinallyReplaces_{index}.cs").write_text(
+            finally_replaces_exception_program(
+                f"FinallyReplaces_{index}",
+                case["thrown"],
+                case["finally_thrown"],
+            ))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 

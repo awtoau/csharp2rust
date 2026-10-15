@@ -34,5 +34,11 @@
   ],
   "rethrow_finally_exception_types": [
     "System.ArgumentException"
+  ],
+  "finally_replaces_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "finally_thrown": "System.InvalidOperationException"
+    }
   ]
 }
