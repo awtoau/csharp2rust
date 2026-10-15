@@ -294,6 +294,12 @@ def main() -> int:
 
     root = repo_root()
     (root / "tmp" / "logs").mkdir(parents=True, exist_ok=True)
+    # Wiped here, before anything that can crash (DB open, emission), not only
+    # at the top of emit_all: a run that dies early (a free-threaded Python
+    # segfault has done this) skips emit_all entirely and leaves the scratch
+    # crate holding whatever an EARLIER run wrote, which the next --keep run
+    # then silently reuses as if it were fresh.
+    shutil.rmtree(root / "tmp" / "compile_check", ignore_errors=True)
     log = logging.getLogger("compile_check")
     log.setLevel(logging.INFO)
     fileh = logging.FileHandler(root / "tmp" / "logs" / "compile_check.log",

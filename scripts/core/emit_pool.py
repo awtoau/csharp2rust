@@ -93,11 +93,11 @@ from typing import NamedTuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for `emitter`
 
-#: Use the CPUs actually available to this process. On the development machine
-#: one of the 32 logical CPUs is offline, so this correctly returns 31 instead
-#: of creating a worker that can never run.
+#: The repository's fixed parallel default. Deliberately NOT host-dependent:
+#: changing worker count with machine state makes timing and validation choices
+#: drift for no project reason.
 def default_jobs() -> int:
-    return os.cpu_count() or 1
+    return 32
 
 
 class Emitted(NamedTuple):
@@ -333,7 +333,7 @@ def report_tail(results: Sequence[Emitted], log: logging.Logger,
 def add_jobs_arg(ap) -> None:
     """`-j` with the same meaning everywhere. Used by the census scripts."""
     ap.add_argument("-j", "--jobs", type=int, default=default_jobs(),
-                    help="emit workers (default: all cores; 1 = serial, "
+                    help="emit workers (default: 32; 1 = serial, "
                          "no pool)")
     ap.add_argument("--no-lpt", action="store_true",
                     help="issue tasks in task order instead of longest-first; "
