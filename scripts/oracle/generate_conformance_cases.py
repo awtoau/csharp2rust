@@ -62,6 +62,34 @@ public static class {name}
 }}
 """
 
+
+def finally_throwing_program(
+        name: str, thrown_exception_type: str, caught_exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        var value = 0;
+        try
+        {{
+            throw new {thrown_exception_type}("conformance");
+        }}
+        catch ({caught_exception_type})
+        {{
+            value = 100;
+        }}
+        finally
+        {{
+            value += 1;
+        }}
+        return value;
+    }}
+}}
+"""
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -89,6 +117,10 @@ def main() -> int:
         (OUT / f"CatchUnmatched_{index}.cs").write_text(
             caught_throwing_program(
                 f"CatchUnmatched_{index}", case["thrown"], case["caught"]))
+    for index, case in enumerate(catalog["finally_exception_types"]):
+        (OUT / f"Finally_{index}.cs").write_text(
+            finally_throwing_program(
+                f"Finally_{index}", case["thrown"], case["caught"]))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 

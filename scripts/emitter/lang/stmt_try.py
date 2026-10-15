@@ -31,7 +31,10 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
     if not getattr(em, "_emitting_conformance", False):
         return None
     children = em.children(oid)
-    if len(children) != 2 or children[0][1] != "Block" or children[1][1] != "CatchClause":
+    if (len(children) not in (2, 3)
+            or children[0][1] != "Block"
+            or children[1][1] != "CatchClause"
+            or (len(children) == 3 and children[2][1] != "Block")):
         return None
     body_id, catch_id = children[0][0], children[1][0]
     if has_return(em, body_id):
@@ -49,9 +52,18 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
     catch_children = em.children(catch_id)
     if len(catch_children) != 1 or catch_children[0][1] != "Block":
         return None
+    catch_body_id = catch_children[0][0]
+    finally_id = children[2][0] if len(children) == 3 else None
+    if finally_id is not None and (
+            has_return(em, catch_body_id) or has_return(em, finally_id)):
+        return None
     pad = "    " * indent
     body = em.emit_block(body_id, indent + 1)
-    handler = em.emit_block(catch_children[0][0], indent + 1)
+    handler = em.emit_block(catch_body_id, indent + 1)
+    final_after = em.emit_block(finally_id, indent) if finally_id is not None else []
+    final_before_rethrow = (
+        em.emit_block(finally_id, indent + 2) if finally_id is not None else []
+    )
     return [
         f"{pad}// C# try/catch: typed managed unwind; unmatched exceptions rethrow.",
         f"{pad}let managed_exception = csharp_rt::catch(|| {{",
@@ -62,6 +74,10 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
         f'{pad}    Err(exception) if csharp_rt::is_type(&exception, "{exception_type}") => {{',
         *handler,
         f"{pad}    }},",
-        f"{pad}    Err(exception) => csharp_rt::rethrow(exception),",
+        f"{pad}    Err(exception) => {{",
+        *final_before_rethrow,
+        f"{pad}        csharp_rt::rethrow(exception);",
+        f"{pad}    }},",
         f"{pad}}};",
+        *final_after,
     ]
