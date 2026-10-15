@@ -53,10 +53,10 @@ def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
     if result.returncode:
         return None
     lines = result.stdout.strip().splitlines()
-    if len(lines) != 1:
+    if not lines:
         return None
     try:
-        return int(lines[0])
+        return int(lines[-1])
     except ValueError:
         return None
 
