@@ -1,5 +1,6 @@
 {
   "integer_literals": ["-1", "0", "1", "int.MinValue", "int.MaxValue"],
   "boolean_literals": ["false", "true"],
-  "string_literals": ["", " ", "\\t", "\\n", "\\0"]
+  "string_literals": ["", " ", "\\t", "\\n", "\\0"],
+  "exception_types": ["System.ArgumentException"]
 }

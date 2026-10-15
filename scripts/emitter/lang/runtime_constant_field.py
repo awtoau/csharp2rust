@@ -8,6 +8,8 @@ from emitter import core
 @core.expr("FieldReference", priority=10)
 def runtime_constant_field(em, oid):
     """Fold only data-defined BCL constants verified against Roslyn's value."""
+    if not getattr(em, "_emitting_conformance", False):
+        return None
     row = em.con.execute(
         "SELECT symbol, const_value, type FROM operation WHERE id=?", (oid,)
     ).fetchone()

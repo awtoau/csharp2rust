@@ -1175,7 +1175,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
     @_core_must_explain
     def emit_peripheral_method(self, type_name: str, method_name: str,
-                              static: bool = False) -> list[str]:
+                              static: bool = False,
+                              conformance: bool = False) -> list[str]:
         """A whole C# method as a free fn over (bank, st).
 
         Distinct from emit_method, which walks a fluent register chain; this
@@ -1215,6 +1216,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         before = sum(self.unhandled.values())
         seen_unhandled = dict(self.unhandled)
         self._current_type = type_name
+        self._emitting_conformance = conformance
         spec = self.project.get("peripheral_methods", {})
         if (ret_cs or "void") == "void":
             ret = spec.get("void_ret", "()")
@@ -1653,7 +1655,8 @@ def main() -> int:
         sys.stdout.write(text)
         return 0
     if args.static_function:
-        lines = em.emit_peripheral_method(args.type, args.method, static=True)
+        lines = em.emit_peripheral_method(
+            args.type, args.method, static=True, conformance=True)
         con.close()
         sys.stdout.write("\n".join(lines) + ("\n" if lines else ""))
         for gap in em.gaps:

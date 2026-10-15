@@ -26,6 +26,20 @@ public static class {name}
 """
 
 
+def throwing_program(name: str, exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        throw new {exception_type}("conformance");
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -39,6 +53,9 @@ def main() -> int:
         cases.append((f"String_{index}", f"\"{escaped}\" == \"{escaped}\""))
     for name, expression in cases:
         (OUT / f"{name}.cs").write_text(program(name, expression))
+    for index, exception_type in enumerate(catalog["exception_types"]):
+        (OUT / f"Throw_{index}.cs").write_text(
+            throwing_program(f"Throw_{index}", exception_type))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 
