@@ -304,6 +304,13 @@
     "ConstantField": {
       "note": "A C# `const` field has NO STORAGE -- the compiler folds its value into every use site, and Roslyn reports the folded constant. Emitting a field access instead named a struct member that cannot exist. Applies only where the DECLARING TYPE is a class: an enum member is also a folded constant, and the enum rule maps it to a named Rust constant, which is better than a bare number.",
       "emit": "{value}"
+    },
+    "RuntimeConstantField": {
+      "note": "A whitelisted BCL static readonly field whose value is part of the C# language/runtime contract. Unlike a C# `const`, it has storage in .NET, so only exact symbols listed here may fold. The emitter also requires Roslyn's recorded value to match this mapping; all other static readonly fields retain their storage and are withheld until the runtime represents them.",
+      "values": {
+        "int.MinValue": "-2147483648",
+        "int.MaxValue": "2147483647"
+      }
     }
   },
   "stdlib": {
@@ -534,7 +541,7 @@
     }
   },
   "format_strings": {
-    "note": "C# composite formatting is NOT Rust format syntax. `{0:X}` is positional-plus-spec; Rust wants `{:X}`. Worse, C# `{1:X8}` means hex padded to 8 -- Rust spells that `{:08X}`, and passing the C# form through is a compile error (`invalid format string: expected }, found 8`), not a wrong string.",
+    "note": "C# composite formatting is NOT Rust format syntax. Keep positional indices because C# reuses and reorders them: `{0:X}` remains `{0:X}` in Rust. C# `{1:X8}` means hex padded to 8, which Rust spells `{1:08X}`. Passing the C# form through is a compile error (`invalid format string: expected }, found 8`), not a wrong string.",
     "strip_index": true,
     "specs": {
       "X": "X",

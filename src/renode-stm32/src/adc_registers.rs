@@ -24,9 +24,9 @@
 //!   - StartConversion: withheld, reaches state this peripheral does not have: st.machine, st.sampling_timer
 //!   - state field `channels`: reference-typed, so the object-graph rule maps it to `Vec<Gc<ADCChannel>>`; blocked: `ADCChannel` has no emitted Rust type yet, so there is nothing to point at
 //!   - state field `currentChannel`: reference-typed, so the object-graph rule maps it to `Gc<ADCChannel>`; blocked: `ADCChannel` has no emitted Rust type yet, so there is nothing to point at
-//!   - state field `machine`: needs trait `IMachine` (D1 maps the field; the trait is issue #41). IMachine declares 112 members, the corpus calls 38
+//!   - state field `machine`: needs trait `IMachine` (D1 maps the field; the trait is issue #41). IMachine declares 115 members, the corpus calls 39
 //!   - state field `samplingTimer`: reference-typed, so the object-graph rule maps it to `Gc<LimitTimer>`; blocked: `LimitTimer` has no emitted Rust type yet, so there is nothing to point at
-//!   - state field `sysbus`: needs trait `IBusController` (D1 maps the field; the trait is issue #41). IBusController declares 73 members, the corpus calls 66
+//!   - state field `sysbus`: needs trait `IBusController` (D1 maps the field; the trait is issue #41). IBusController declares 78 members, the corpus calls 68
 
 use renode_regs::{Bank, FieldMode, FlagId, ValueId};
 
@@ -114,7 +114,7 @@ fn regular_sequence1_20_writer(bank: &Bank<State>, st: &mut State, _idx: usize, 
 }
 
 fn regular_data_0_provider(bank: &Bank<State>, st: &mut State, _idx: usize, _current: u64) -> u64 {
-    log::debug!("Reading ADC data {}", st.adc_data);
+    log::debug!("Reading ADC data {0}", st.adc_data);
     bank.set_flag(st.f.end_of_conversion, false);
     st.irq = false;
     return (st.adc_data as u64);

@@ -392,9 +392,11 @@ def main() -> int:
         if d.get("level") != "error":
             continue
         total += 1
-        code = (d.get("code") or {}).get("code") or "no-code"
-        codes[code] += 1
-        examples.setdefault(code, (d.get("message") or "")[:88])
+        message = d.get("message") or "<no diagnostic message>"
+        code = (d.get("code") or {}).get("code")
+        group = code or f"no-code: {message}"
+        codes[group] += 1
+        examples.setdefault(group, message[:88])
         for span in d.get("spans", []):
             f = span.get("file_name", "")
             if f.endswith(".rs"):
@@ -408,10 +410,11 @@ def main() -> int:
         log.info("code the converter was confident enough to emit is at least")
         log.info("well-formed. It says nothing about whether it is CORRECT.")
     else:
-        log.info("%-14s %7s  %s", "rustc code", "count", "example")
+        log.info("%-60s %7s  %s", "rustc code or message", "count", "example")
         log.info("%s", "-" * 78)
         for code, n in codes.most_common(20):
-            log.info("%-14s %7d  %s", code, n, examples.get(code, "")[:56])
+            label = code if len(code) <= 60 else code[:57] + "..."
+            log.info("%-60s %7d  %s", label, n, examples.get(code, "")[:56])
         log.info("%s", "-" * 78)
         log.info("%d error(s) across %d module(s)", total, len(per_mod))
         log.info("")
@@ -462,7 +465,7 @@ def main() -> int:
                            "was a 1.6% rise against 3,072 and passed).",
             "may_only_grow": "min_modules is a floor. Shrinking the set takes "
                              "two edits so it cannot happen quietly.",
-            "record_with": "python3 scripts/compile_check.py --record-clean-set",
+            "record_with": "python3.15t scripts/validation/compile_check.py --record-clean-set",
             "min_modules": len(clean_now),
             "modules": sorted(clean_now),
         }

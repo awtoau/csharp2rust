@@ -161,6 +161,21 @@ def _load_registered() -> None:
 _load_registered()
 
 
+def select_corpus_run(con: sqlite3.Connection, run_id: int | None) -> int | None:
+    """Select one corpus run or reject an ambiguous database."""
+    if run_id is not None:
+        row = con.execute("SELECT id FROM corpus_run WHERE id=?", (run_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"corpus run {run_id} does not exist")
+        return row[0]
+    rows = con.execute("SELECT id FROM corpus_run ORDER BY id").fetchall()
+    if len(rows) > 1:
+        ids = ", ".join(str(row[0]) for row in rows)
+        raise ValueError(
+            f"database has multiple corpus runs ({ids}); pass --run-id explicitly")
+    return rows[0][0] if rows else None
+
+
 class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions,
               Statements, DispatchTrait, InterfaceTrait, Types, Postcondition,
               Severity):
@@ -175,7 +190,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
     def __init__(self, con: sqlite3.Connection, log: logging.Logger,
                  rules_dir: Path | None = None,
-                 utility_fn_table: dict[str, set[str]] | None = None):
+                 utility_fn_table: dict[str, set[str]] | None = None,
+                 run_id: int | None = None):
         self.con = con
         self.log = log
         self.unhandled: dict[str, int] = {}
@@ -200,8 +216,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         self.normalised: dict[str, set[int]] = {}
         self._enum_slots: set[str] = set()
         self._current_reg: str | None = None
-        run = self.con.execute("SELECT id FROM corpus_run LIMIT 1").fetchone()
-        self._run_id = run[0] if run else None
+        self._run_id = select_corpus_run(self.con, run_id)
         self._params_cache: dict[str, list[str]] = {}
         # The operation tree is immutable for an emitter run. Large types used
         # to execute the identical child query millions of times while walking
@@ -962,9 +977,17 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         # Keyed on the type's ID, never its name: the corpus holds many types
         # called `Registers` and two called `Mode`, and matching by name merged
         # all of them into one enum with duplicate discriminants.
+        seen: set[str] = set()
         for tid, ename in self.con.execute(
                 "SELECT t.id, t.name FROM type t WHERE t.kind='enum' "
-                "AND t.key LIKE ? ORDER BY t.name", (f"%.{type_name}.%",)):
+                "AND t.key LIKE ? ORDER BY LENGTH(t.key), t.key",
+                (f"%.{type_name}.%",)):
+            if ename in seen:
+                    self.log.warning(
+                        "%s: skipping nested enum `%s` with duplicate flat Rust name",
+                        type_name, ename)
+                    continue
+            seen.add(ename)
             members = self.con.execute(
                 "SELECT mb.name, mb.const_value FROM member mb "
                 "WHERE mb.type_id=? AND mb.const_value IS NOT NULL "
@@ -1127,6 +1150,22 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
     def fn_name(self, method_name: str) -> str:
         """Emitted function name. Property accessors lose their get_/set_ prefix
         so they match the PropertyReference call sites."""
+        if "." in method_name:
+            # Only explicit interface implementations have dotted C# member
+            # names. Keep the interface and member suffix so two interfaces
+            # implementing the same member remain distinct Rust functions.
+            segments, start, depth = [], 0, 0
+            for index, char in enumerate(method_name):
+                if char == "<":
+                    depth += 1
+                elif char == ">":
+                    depth -= 1
+                elif char == "." and depth == 0:
+                    segments.append(method_name[start:index])
+                    start = index + 1
+            segments.append(method_name[start:])
+            method_name = re.sub(r"[^A-Za-z0-9_]", "_",
+                                 "_".join(segments[-2:]))
         for pre in (self.project.get("peripheral_methods", {})
                     .get("accessor_names", {}).get("strip_prefixes", [])):
             if method_name.startswith(pre):
@@ -1136,7 +1175,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
     @_core_must_explain
     def emit_peripheral_method(self, type_name: str, method_name: str,
-                              static: bool = False) -> list[str]:
+                              static: bool = False,
+                              conformance: bool = False) -> list[str]:
         """A whole C# method as a free fn over (bank, st).
 
         Distinct from emit_method, which walks a fluent register chain; this
@@ -1176,6 +1216,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         before = sum(self.unhandled.values())
         seen_unhandled = dict(self.unhandled)
         self._current_type = type_name
+        self._emitting_conformance = conformance
         spec = self.project.get("peripheral_methods", {})
         if (ret_cs or "void") == "void":
             ret = spec.get("void_ret", "()")
@@ -1440,7 +1481,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         if type_name not in self._utility_owner_names:
             self._utility_fn_cache[type_name] = None
             return None
-        scratch = Emitter(self.con, self.log, self._rules_dir)
+        scratch = Emitter(self.con, self.log, self._rules_dir,
+                          run_id=self._run_id)
         text = scratch.emit_utility_file(type_name)
         fns = set(re.findall(r"(?m)^pub fn ([a-z_][a-z0-9_]*)\(", text))
         self._utility_fn_cache[type_name] = fns
@@ -1475,7 +1517,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
 def compute_utility_fn_table(con: sqlite3.Connection,
                              log: logging.Logger,
-                             rules_dir: Path | None = None
+                             rules_dir: Path | None = None,
+                             run_id: int | None = None,
                              ) -> dict[str, set[str]]:
     """Every utility type's emitted fn names, computed once for a whole run.
 
@@ -1489,7 +1532,7 @@ def compute_utility_fn_table(con: sqlite3.Connection,
     from register_owners import utility_owners
     table: dict[str, set[str]] = {}
     for name in utility_owners(con, rules_dir):
-        scratch = Emitter(con, log, rules_dir)
+        scratch = Emitter(con, log, rules_dir, run_id=run_id)
         text = scratch.emit_utility_file(name)
         table[name] = set(re.findall(r"(?m)^pub fn ([a-z_][a-z0-9_]*)\(", text))
     return table
@@ -1526,8 +1569,13 @@ def main() -> int:
     ap.add_argument("--type")
     ap.add_argument("--method")
     ap.add_argument("--db", default="rulesdb/patterns.db")
+    ap.add_argument("--run-id", type=int,
+                    help="corpus run to emit; required when the database has "
+                         "more than one run")
     ap.add_argument("--file", metavar="MODULE",
                     help="emit a complete Rust module to stdout")
+    ap.add_argument("--static-function", action="store_true",
+                    help="emit --type/--method as a pure static Rust function")
     ap.add_argument("--interfaces", action="store_true",
                     help="emit every C# interface that can be a COMPLETE Rust "
                          "trait, to stdout")
@@ -1564,7 +1612,11 @@ def main() -> int:
     log.addHandler(fh); log.addHandler(sh)
 
     con = sqlite3.connect(root / args.db)
-    em = Emitter(con, log)
+    try:
+        em = Emitter(con, log, run_id=args.run_id)
+    except ValueError as exc:
+        con.close()
+        ap.error(str(exc))
     em.conformance = set(args.conformance)
     unknown = em.conformance - {s.get("id") for s in em.bug_stanzas()}
     if unknown:
@@ -1601,6 +1653,14 @@ def main() -> int:
         text = em.emit_file(args.type, args.method, args.file)
         con.close()
         sys.stdout.write(text)
+        return 0
+    if args.static_function:
+        lines = em.emit_peripheral_method(
+            args.type, args.method, static=True, conformance=True)
+        con.close()
+        sys.stdout.write("\n".join(lines) + ("\n" if lines else ""))
+        for gap in em.gaps:
+            print(f"withheld: {gap}", file=sys.stderr)
         return 0
     lines = em.emit_method(args.type, args.method)
     con.close()

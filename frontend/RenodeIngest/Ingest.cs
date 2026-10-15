@@ -24,7 +24,8 @@ public static class Ingest
     public static async Task<bool> RunAsync(Compilation compilation,
                                             IReadOnlyList<SyntaxTree> trees,
                                             string dbPath, string treeRoot,
-                                            string renodeCommit, int threads,
+                                            string sourceName, string sourceRevision,
+                                            int threads,
                                             string config)
     {
         // --- Pass 1: parallel walk -------------------------------------------
@@ -75,11 +76,11 @@ public static class Ingest
         await using var tx = (SqliteTransaction)await db.BeginTransactionAsync();
 
         var runId = await ScalarInsert(db, tx,
-            "INSERT INTO corpus_run(started_at,renode_commit,tool_version,config,host) " +
-            "VALUES ($a,$b,$c,$d,$e) RETURNING id",
+            "INSERT INTO corpus_run(started_at,source_name,source_revision,tool_version,config,host) " +
+            "VALUES ($a,$b,$c,$d,$e,$f) RETURNING id",
             ("$a", DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz")),
-            ("$b", renodeCommit), ("$c", ToolVersion()), ("$d", config),
-            ("$e", Environment.MachineName));
+            ("$b", sourceName), ("$c", sourceRevision), ("$d", ToolVersion()),
+            ("$e", config), ("$f", Environment.MachineName));
 
         var typeIds = new Dictionary<string, long>(StringComparer.Ordinal);
         var memberIds = new Dictionary<string, long>(StringComparer.Ordinal);

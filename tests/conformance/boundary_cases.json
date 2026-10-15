@@ -1,0 +1,58 @@
+{
+  "integer_literals": ["-1", "0", "1", "int.MinValue", "int.MaxValue"],
+  "boolean_literals": ["false", "true"],
+  "string_literals": ["", " ", "\\t", "\\n", "\\0"],
+  "exception_types": ["System.ArgumentException"],
+  "caught_exception_types": ["System.ArgumentException"],
+  "base_catch_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "caught": "System.Exception"
+    }
+  ],
+  "unmatched_catch_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "caught": "System.InvalidOperationException"
+    }
+  ],
+  "finally_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "caught": "System.ArgumentException"
+    }
+  ],
+  "rethrow_exception_types": [
+    "System.ArgumentException"
+  ],
+  "unmatched_finally_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "inner_caught": "System.InvalidOperationException",
+      "outer_caught": "System.ArgumentException"
+    }
+  ],
+  "rethrow_finally_exception_types": [
+    "System.ArgumentException"
+  ],
+  "finally_replaces_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "finally_thrown": "System.InvalidOperationException"
+    }
+  ],
+  "multiple_catch_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "first_catch": "System.InvalidOperationException",
+      "second_catch": "System.ArgumentException"
+    }
+  ],
+  "finally_without_catch_exception_types": [
+    "System.ArgumentException"
+  ],
+  "catch_variable_exception_types": [
+    "System.ArgumentException"
+  ],
+  "custom_exception_inheritance_cases": 1
+}

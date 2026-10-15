@@ -569,8 +569,8 @@ class Census:
                 run=self.con.execute(
                     "SELECT config FROM corpus_run ORDER BY id LIMIT 1"
                 ).fetchone()[0],
-                renode_commit=self.con.execute(
-                    "SELECT renode_commit FROM corpus_run ORDER BY id LIMIT 1"
+                source_revision=self.con.execute(
+                    "SELECT source_revision FROM corpus_run ORDER BY id LIMIT 1"
                 ).fetchone()[0],
                 classes=n_classes,
                 types=len(self.types),

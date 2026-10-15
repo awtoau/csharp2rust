@@ -33,4 +33,12 @@ def reference(em, oid):
     if not symbol:
         return None
     kids = [c[0] for c in em.children(oid)]
+    catch_variable = getattr(em, "_caught_exception_name", None)
+    catch_type = getattr(em, "_caught_exception_type", None)
+    if (getattr(em, "_emitting_conformance", False)
+            and catch_variable
+            and symbol == f"{catch_type}.Message"
+            and len(kids) == 1
+            and em.emit_expr(kids[0]) == catch_variable):
+        return f"{catch_variable}.message()"
     return em.emit_reference(kind, symbol, kids)

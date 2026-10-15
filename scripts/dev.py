@@ -155,6 +155,12 @@ def cmd_build(extra: list[str]) -> int:
                 "--working-set", "--ratchet", *extra])
 
 
+@command("reject ambiguous corpus-run selection in the emitter", kind="validation")
+def cmd_check_corpus_selection(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/validation/check_corpus_selection.py",
+                *extra])
+
+
 @command("point git at scripts/githooks so the pre-commit gates run", kind="action")
 def cmd_install_hooks(_extra: list[str]) -> int:
     return run(["git", "config", "core.hooksPath", "scripts/githooks"])
@@ -168,6 +174,22 @@ def cmd_regenerate(extra: list[str]) -> int:
 @command("run the Rust workspace test suite", kind="step")
 def cmd_test(extra: list[str]) -> int:
     return run(["cargo", "test", "--workspace", *extra])
+
+
+@command("compare C# TestEntryPoint programs with generated Rust", kind="oracle")
+def cmd_conformance(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/oracle/conformance.py", *extra])
+
+
+@command("discover dotnet runtime conformance candidates", kind="oracle")
+def cmd_discover_conformance(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/oracle/discover_conformance.py", *extra])
+
+
+@command("pin a Renode release and ingest a verified scratch corpus (issue #80)",
+         kind="action")
+def cmd_sync_renode(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/sync_renode.py", *extra])
 
 
 @command("run the fail-fast everyday validation tier", kind="aggregate")

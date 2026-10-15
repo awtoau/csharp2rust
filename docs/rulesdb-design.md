@@ -43,7 +43,7 @@ Process rules do not survive schedule pressure. These are mechanical.
 
 ## Schema
 
-SQLite. `run_id` on every table; a run is one ingest of one Renode commit.
+SQLite. `run_id` on every table; a run is one ingest of one named source revision.
 
 ### Provenance
 
@@ -51,7 +51,8 @@ SQLite. `run_id` on every table; a run is one ingest of one Renode commit.
 CREATE TABLE corpus_run (
     id            INTEGER PRIMARY KEY,
     started_at    TEXT NOT NULL,          -- ISO 8601 with offset
-    renode_commit TEXT NOT NULL,
+    source_name   TEXT NOT NULL,          -- e.g. 'renode' or 'dotnet-runtime'
+    source_revision TEXT NOT NULL,
     tool_version  TEXT NOT NULL,          -- ingest tool git describe
     config        TEXT NOT NULL,          -- run purpose: 'tree' | 'breadth'
     notes         TEXT

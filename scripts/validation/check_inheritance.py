@@ -155,9 +155,9 @@ def synthetic_corpus(root: Path, collide: bool) -> sqlite3.Connection:
     """
     con = sqlite3.connect(":memory:")
     con.executescript((root / "rulesdb" / "schema.sql").read_text())
-    con.execute("INSERT INTO corpus_run (id, started_at, renode_commit, "
-                "tool_version, config) VALUES (1, '2026-01-01T00:00:00+10:00', "
-                "'-', '-', 'unit')")
+    con.execute("INSERT INTO corpus_run (id, started_at, source_name, "
+                "source_revision, tool_version, config) VALUES "
+                "(1, '2026-01-01T00:00:00+10:00', 'fixture', '-', '-', 'unit')")
     con.execute("INSERT INTO file (id, run_id, path, sha256, loc) "
                 "VALUES (1, 1, 'unit.cs', '-', 0)")
     for tid, name, base in ((1, "Base", None), (2, "Derived", 1)):
