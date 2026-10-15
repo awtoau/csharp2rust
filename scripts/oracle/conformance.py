@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import shutil
 import sqlite3
@@ -60,10 +61,28 @@ def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
         return None
 
 
+def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, bool, bool]:
+    source = source_dir / f"{type_name}.cs"
+    case = cases / type_name
+    case.mkdir()
+    write_csharp_runner(case, source, type_name)
+    csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
+    emission = run([
+        sys.executable, str(EMITTER), "--db", str(db),
+        "--type", type_name, "--method", "TestEntryPoint", "--static-function",
+    ], ROOT)
+    if emission.returncode or not emission.stdout.strip():
+        return type_name, False, False
+    write_rust_runner(case, emission.stdout)
+    rust = output_value(run(["cargo", "run", "--quiet"], case))
+    return type_name, True, csharp is not None and rust == csharp
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--keep", action="store_true")
+    ap.add_argument("-j", "--jobs", type=int, default=32)
     args = ap.parse_args()
 
     work = ROOT / "tmp" / "conformance"
@@ -94,26 +113,15 @@ def main() -> int:
     cases = work / "cases"
     shutil.rmtree(cases, ignore_errors=True)
     cases.mkdir()
-    agreed = disagreed = emitted = 0
-    for type_name in types:
-        source = source_dir / f"{type_name}.cs"
-        case = cases / type_name
-        case.mkdir()
-        write_csharp_runner(case, source, type_name)
-        csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
-        emission = run([
-            sys.executable, str(EMITTER), "--db", str(db),
-            "--type", type_name, "--method", "TestEntryPoint", "--static-function",
-        ], ROOT)
-        if emission.returncode or not emission.stdout.strip():
-            continue
-        emitted += 1
-        write_rust_runner(case, emission.stdout)
-        rust = output_value(run(["cargo", "run", "--quiet"], case))
-        if csharp is not None and rust == csharp:
-            agreed += 1
-        else:
-            disagreed += 1
+    if args.jobs < 1:
+        ap.error("--jobs must be positive")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        results = list(pool.map(
+            lambda name: run_case(name, source_dir, db, cases), types))
+    results.sort()
+    emitted = sum(emitted for _name, emitted, _agreed in results)
+    agreed = sum(emitted and matches for _name, emitted, matches in results)
+    disagreed = sum(emitted and not matches for _name, emitted, matches in results)
     print(json.dumps({
         "cases": len(types), "emitted": emitted, "agreed": agreed,
         "disagreed": disagreed,
