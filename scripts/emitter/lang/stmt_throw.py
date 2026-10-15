@@ -5,6 +5,19 @@ from __future__ import annotations
 from emitter import core
 
 
+def enclosing_finally(em, oid: int, indent: int) -> list[str]:
+    scope = getattr(em, "_catch_finally_scope", None)
+    if scope is None:
+        return []
+    finally_id, catch_body_id = scope
+    row = em.con.execute(
+        "SELECT parent_id FROM operation WHERE id=?", (oid,)
+    ).fetchone()
+    if row is None or row[0] != catch_body_id:
+        return []
+    return em.emit_block(finally_id, indent)
+
+
 @core.stmt("Throw")
 def throw_stmt(em, oid: int, indent: int) -> list[str] | None:
     if not getattr(em, "_emitting_conformance", False):
@@ -16,6 +29,7 @@ def throw_stmt(em, oid: int, indent: int) -> list[str] | None:
             return None
         pad = "    " * indent
         return [
+            *enclosing_finally(em, oid, indent),
             f"{pad}// C# throw;: rethrow the active managed exception.",
             f"{pad}csharp_rt::rethrow({caught});",
         ]
@@ -42,6 +56,7 @@ def throw_stmt(em, oid: int, indent: int) -> list[str] | None:
     message = em.emit_expr(arguments[0]) if arguments else '""'
     pad = "    " * indent
     return [
+        *enclosing_finally(em, oid, indent),
         f'{pad}// C# throw: managed exception unwind, not a Rust panic.',
         f'{pad}csharp_rt::throw(csharp_rt::CsException::new('
         f'"{row[1]}", {message}));',

@@ -31,5 +31,8 @@
       "inner_caught": "System.InvalidOperationException",
       "outer_caught": "System.ArgumentException"
     }
+  ],
+  "rethrow_finally_exception_types": [
+    "System.ArgumentException"
   ]
 }

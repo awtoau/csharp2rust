@@ -149,6 +149,40 @@ public static class {name}
 """
 
 
+def rethrowing_finally_program(name: str, exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        var value = 0;
+        try
+        {{
+            try
+            {{
+                throw new {exception_type}("conformance");
+            }}
+            catch ({exception_type})
+            {{
+                throw;
+            }}
+            finally
+            {{
+                value = 100;
+            }}
+        }}
+        catch ({exception_type})
+        {{
+            return value;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -191,6 +225,9 @@ def main() -> int:
                 case["inner_caught"],
                 case["outer_caught"],
             ))
+    for index, exception_type in enumerate(catalog["rethrow_finally_exception_types"]):
+        (OUT / f"FinallyRethrow_{index}.cs").write_text(
+            rethrowing_finally_program(f"FinallyRethrow_{index}", exception_type))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 

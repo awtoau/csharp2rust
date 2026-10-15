@@ -60,11 +60,16 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
     pad = "    " * indent
     body = em.emit_block(body_id, indent + 1)
     previous_caught = getattr(em, "_caught_exception_name", None)
+    previous_finally_scope = getattr(em, "_catch_finally_scope", None)
     em._caught_exception_name = "exception"
+    em._catch_finally_scope = (
+        (finally_id, catch_body_id) if finally_id is not None else None
+    )
     try:
         handler = em.emit_block(catch_body_id, indent + 1)
     finally:
         em._caught_exception_name = previous_caught
+        em._catch_finally_scope = previous_finally_scope
     final_after = em.emit_block(finally_id, indent) if finally_id is not None else []
     final_before_rethrow = (
         em.emit_block(finally_id, indent + 2) if finally_id is not None else []
