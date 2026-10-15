@@ -57,7 +57,14 @@ def write_csharp_runner(case: Path, sources: list[Path], type_name: str) -> None
         "namespace Xunit { public sealed class FactAttribute : System.Attribute {} }\n"
         "public sealed class OuterLoopAttribute : System.Attribute {}\n")
     (case / "ConformanceRunner.cs").write_text(
-        f"System.Console.WriteLine({type_name}.TestEntryPoint());\n")
+        "try\n"
+        "{\n"
+        f"    System.Console.WriteLine(\"return:\" + {type_name}.TestEntryPoint());\n"
+        "}\n"
+        "catch (System.Exception exception)\n"
+        "{\n"
+        "    System.Console.WriteLine(\"throw:\" + exception.GetType().FullName);\n"
+        "}\n")
 
 
 def write_rust_runner(case: Path, emitted: str) -> None:
@@ -66,24 +73,31 @@ name = "conformance-case"
 version = "0.0.0"
 edition = "2021"
 
+[dependencies]
+csharp-rt = { path = "%RUNTIME_PATH%" }
+
 [workspace]
-""")
+""".replace("%RUNTIME_PATH%", str(ROOT / "src" / "csharp-rt")))
     src = case / "src"
     src.mkdir()
     (src / "main.rs").write_text(
-        emitted + "\nfn main() { println!(\"{}\", test_entry_point()); }\n")
+        emitted
+        + "\nfn main() {\n"
+          "    match csharp_rt::catch(|| test_entry_point()) {\n"
+          "        Ok(value) => println!(\"return:{}\", value),\n"
+          "        Err(exception) => println!(\"throw:{}\", exception.type_name()),\n"
+          "    }\n"
+          "}\n")
 
 
-def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
+def output_value(result: subprocess.CompletedProcess[str]) -> str | None:
     if result.returncode:
         return None
     lines = result.stdout.strip().splitlines()
     if not lines:
         return None
-    try:
-        return int(lines[-1])
-    except ValueError:
-        return None
+    value = lines[-1]
+    return value if value.startswith(("return:", "throw:")) else None
 
 
 def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
@@ -96,7 +110,7 @@ def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
     write_csharp_runner(case, [source], type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
     if csharp is None:
-        return relative_source, "source_failed", "C# entry point did not produce an integer"
+        return relative_source, "source_failed", "C# entry point produced no tagged observation"
     emission = run([
         sys.executable, str(EMITTER), "--db", str(db),
         "--type", type_name, "--method", "TestEntryPoint", "--static-function",
@@ -185,7 +199,7 @@ def run_runtime_candidate(candidate: dict[str, str], tests: Path,
     write_csharp_runner(case, staged_sources, type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
     if csharp is None:
-        return relative_source, "source_failed", "C# entry point did not produce an integer"
+        return relative_source, "source_failed", "C# entry point produced no tagged observation"
     emission = run([
         sys.executable, str(EMITTER), "--db", str(db),
         "--type", type_name, "--method", "TestEntryPoint", "--static-function",
