@@ -1,11 +1,12 @@
 //! Managed exception payloads for translated C# `throw` and `catch`.
 
-use std::panic::{catch_unwind, panic_any, resume_unwind, UnwindSafe};
+use std::panic::{catch_unwind, panic_any, resume_unwind, AssertUnwindSafe};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CsException {
     type_name: String,
     message: String,
+    base_types: Vec<String>,
 }
 
 impl CsException {
@@ -13,7 +14,17 @@ impl CsException {
         Self {
             type_name: type_name.into(),
             message: message.into(),
+            base_types: Vec::new(),
         }
+    }
+
+    pub fn with_base_types<I, S>(mut self, base_types: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.base_types = base_types.into_iter().map(Into::into).collect();
+        self
     }
 
     pub fn type_name(&self) -> &str {
@@ -29,8 +40,8 @@ pub fn throw(exception: CsException) -> ! {
     panic_any(exception);
 }
 
-pub fn catch<T>(body: impl FnOnce() -> T + UnwindSafe) -> Result<T, CsException> {
-    match catch_unwind(body) {
+pub fn catch<T>(body: impl FnOnce() -> T) -> Result<T, CsException> {
+    match catch_unwind(AssertUnwindSafe(body)) {
         Ok(value) => Ok(value),
         Err(payload) => match payload.downcast::<CsException>() {
             Ok(exception) => Err(*exception),
@@ -42,9 +53,10 @@ pub fn catch<T>(body: impl FnOnce() -> T + UnwindSafe) -> Result<T, CsException>
 pub fn is_type(exception: &CsException, type_name: &str) -> bool {
     // Every payload created by this module represents a managed exception, so
     // C# `catch (System.Exception)` matches it regardless of its concrete
-    // type. More-specific custom base chains are emitted from corpus type facts
-    // before their catch shapes are enabled.
-    type_name == "System.Exception" || exception.type_name == type_name
+    // type. The converter emits more-specific base chains from corpus facts.
+    type_name == "System.Exception"
+        || exception.type_name == type_name
+        || exception.base_types.iter().any(|base| base == type_name)
 }
 
 pub fn rethrow(exception: CsException) -> ! {
@@ -75,12 +87,38 @@ mod tests {
     }
 
     #[test]
+    fn catches_managed_exception_after_mutating_csharp_local() {
+        let mut value = 0;
+        let result = catch(|| {
+            value = 100;
+            throw(CsException::new(
+                "System.ArgumentException",
+                "value is invalid",
+            ));
+        });
+
+        assert!(result.is_err());
+        assert_eq!(value, 100);
+    }
+
+    #[test]
     fn every_managed_exception_matches_system_exception() {
         let exception = CsException::new(
             "System.ArgumentException",
             "value is invalid",
         );
         assert!(is_type(&exception, "System.Exception"));
+    }
+
+    #[test]
+    fn derived_exception_matches_a_recorded_custom_base() {
+        let exception = CsException::new(
+            "Renode.SpecificException",
+            "value is invalid",
+        )
+        .with_base_types(["Renode.BaseException", "System.Exception"]);
+
+        assert!(is_type(&exception, "Renode.BaseException"));
     }
 
     #[test]

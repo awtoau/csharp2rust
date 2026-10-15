@@ -118,7 +118,12 @@ def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
     if emission.returncode or not emission.stdout.strip():
         return relative_source, "withheld", emission.stderr.strip() or "no emitted Rust"
     write_rust_runner(case, emission.stdout)
-    rust = output_value(run(["cargo", "run", "--quiet"], case))
+    rust_run = run(["cargo", "run", "--quiet"], case)
+    if rust_run.returncode:
+        return relative_source, "rust_failed", failure_reason(rust_run)
+    rust = output_value(rust_run)
+    if rust is None:
+        return relative_source, "rust_failed", "Rust entry point produced no tagged observation"
     return relative_source, "agreed" if rust == csharp else "disagreed", ""
 
 
@@ -207,7 +212,12 @@ def run_runtime_candidate(candidate: dict[str, str], tests: Path,
     if emission.returncode or not emission.stdout.strip():
         return relative_source, "withheld", emission.stderr.strip() or "no emitted Rust"
     write_rust_runner(case, emission.stdout)
-    rust = output_value(run(["cargo", "run", "--quiet"], case))
+    rust_run = run(["cargo", "run", "--quiet"], case)
+    if rust_run.returncode:
+        return relative_source, "rust_failed", failure_reason(rust_run)
+    rust = output_value(rust_run)
+    if rust is None:
+        return relative_source, "rust_failed", "Rust entry point produced no tagged observation"
     return relative_source, "agreed" if rust == csharp else "disagreed", ""
 
 
@@ -285,12 +295,12 @@ def main() -> int:
     finally:
         result_con.close()
     statuses = ("agreed", "disagreed", "withheld", "source_failed",
-                "ingest_failed", "ambiguous_entry")
+                "ingest_failed", "ambiguous_entry", "rust_failed")
     counts = {status: sum(1 for _name, found, _reason, _duration in results if found == status)
               for status in statuses}
     report = {
         "cases": len(results),
-        "emitted": counts["agreed"] + counts["disagreed"],
+        "emitted": counts["agreed"] + counts["disagreed"] + counts["rust_failed"],
         **counts,
         "reasons": {
             name: reason for name, status, reason, _duration in results if reason
@@ -303,7 +313,7 @@ def main() -> int:
     print(rendered)
     if not args.keep:
         shutil.rmtree(cases, ignore_errors=True)
-    return 1 if counts["disagreed"] else 0
+    return 1 if counts["disagreed"] or counts["rust_failed"] else 0
 
 
 if __name__ == "__main__":
