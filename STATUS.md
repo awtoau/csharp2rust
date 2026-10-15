@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T17:32:49+11:00 from `044ad9d` by `scripts/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-15T19:31:42+11:00 from `6df3437` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -10,7 +10,7 @@ averaged 1.87 validation instances each.
 
 | metric | value | target | status |
 |---|---:|---:|---|
-| **compile-clean modules (the gate)** | 663 | ratchet, may only grow | PASS |
+| **compile-clean modules (the gate)** | 695 | ratchet, may only grow | PASS |
 | platform floor (peripherals reachable end-to-end) | 48 / 65 | 65 | 74% |
 | modules clean *and* drivable | 298 / 687 | — | 43% |
 | oracle trace replay: peripherals at 0 divergence | 3 / 8 | 8 | partial |
@@ -29,9 +29,9 @@ averaged 1.87 validation instances each.
 
 | | count |
 |---|---:|
-| methods ingested | 26,159 |
-| operation nodes | 1,590,724 |
-| types ingested | 4,832 |
+| methods ingested | 26,955 |
+| operation nodes | 1,661,567 |
+| types ingested | 4,962 |
 
 **Emission floor** (`docs/status/floor.json`, see [docs/decisions/the-floor-that-runs.md](docs/decisions/the-floor-that-runs.md)):
 
@@ -99,7 +99,7 @@ Genuine stop points. A failed gate means stop, not retry.
 
 | gate | status | evidence |
 |---|---|---|
-| **two-tier compile gate** — modules with 0 rustc errors | 663 (ratchet, may only grow) | [docs/decisions/two-tier-compile-gate.md](docs/decisions/two-tier-compile-gate.md) |
+| **two-tier compile gate** — modules with 0 rustc errors | 695 (ratchet, may only grow) | [docs/decisions/two-tier-compile-gate.md](docs/decisions/two-tier-compile-gate.md) |
 | **the floor that runs** — peripherals reachable end-to-end | 48 / 65 | [docs/decisions/the-floor-that-runs.md](docs/decisions/the-floor-that-runs.md) |
 
 ### Historical (Phase 0/1)
@@ -141,12 +141,12 @@ Genuine stop points. A failed gate means stop, not retry.
 | marker | sites in emitted Rust | what differs |
 |---|---:|---|
 | `WARN(condwrite)` | 5 | the source performs this access only under a guard; here it is UNCONDITIONAL. The guard reads state this declaration cannot see. |
-| `WARN(eager)` | 6 | a lazy sequence became an owned collection: it is evaluated EAGERLY, so enumeration side effects and their order differ. |
+| `WARN(eager)` | 8 | a lazy sequence became an owned collection: it is evaluated EAGERLY, so enumeration side effects and their order differ. |
 | `SYNC(measure)` | 0 | C# `lock`. Structure preserved; TIMING IS NOT. |
-| `WARN(multicast)` | 7 | a multicast event collapsed to ONE subscribe: there is no unsubscribe, and a second subscriber replaces the first. |
-| `WARN(narrowed)` | 15 | a value outside the declared set has no variant here: the source keeps the number, this falls back to the default. |
+| `WARN(multicast)` | 8 | a multicast event collapsed to ONE subscribe: there is no unsubscribe, and a second subscriber replaces the first. |
+| `WARN(narrowed)` | 16 | a value outside the declared set has no variant here: the source keeps the number, this falls back to the default. |
 | `WARN(orderby)` | 0 | ordering is a PASS-THROUGH: the key selector is discarded and the sequence keeps its source order. |
-| **total** | **33** | |
+| **total** | **37** | |
 
 A **gap** withholds the member, so it can never read as a translation. A **warning** emitted and is wrong in a stated way — the number is the count of sites carrying the marker, not the count of deviations declared, so a deviation that is declared and never marked reads as zero rather than as done.
 
@@ -172,7 +172,7 @@ does not have.
 |---|---|
 | files produced by the converter | 1 (`uart_registers.rs`) |
 | peripherals still hand-written | uart behaviour, gpio layout + behaviour |
-| enforcement | `check_generated.py` is in the pre-commit hook, but the hook is NOT installed here (`python3 scripts/dev.py install-hooks`) |
+| enforcement | `check_generated.py`, pre-commit (hook installed) |
 
 The UART's register layout is now generated and enforced byte-for-byte.
 Deleting the hand-written version removed three edits that had survived
@@ -221,13 +221,13 @@ hybrid host was ~50% from core migration; pinned it is ±2%.
 
 | | |
 |---|---|
-| Renode commit | `dc52b24c118a` |
-| firmware ELF | `awto-htc.elf` `4eccbaee25d7` |
+| Renode commit | `ab721d88e135` |
+| firmware ELF | `awto-htc.elf` `278f5c57fb65` |
 | markers in order | 8 / 8 |
-| init steps | 19 (2 expected failures) |
-| `system_boot OK` | 291 ms simulated |
-| first output | host 26.57s / virt 7.16s (LSI-measurement cost) |
-| real-time ratio | 0.16× |
+| init steps | 17 (0 expected failures) |
+| `system_boot OK` | 302 ms simulated |
+| first output | host 2.18s / virt 0.48s (LSI-measurement cost) |
+| real-time ratio | 0.567× |
 
 > The real-time ratio is **contaminated**: `SystemBus::TryGetTag` is 12.78% of
 > profile, driven by 16,827 accesses per boot to unmapped ADC_CCR
@@ -236,16 +236,19 @@ hybrid host was ~50% from core migration; pinned it is ±2%.
 
 ## Issues
 
-68 open, 14 closed, 82 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
+38 open, 47 closed, 85 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
 
 | phase | open | closed |
 |---|---:|---:|
-| unphased | 68 | 14 |
+| unphased | 38 | 47 |
 
 **By label** (an issue may carry more than one; counts are not additive to the total above):
 
 | label | issues |
 |---|---:|
 | `bug` | 3 — [#66](https://github.com/awtoau/csharp2rust/issues/66), [#71](https://github.com/awtoau/csharp2rust/issues/71), [#77](https://github.com/awtoau/csharp2rust/issues/77) |
+| `triage:done` | 20 — [#4](https://github.com/awtoau/csharp2rust/issues/4), [#5](https://github.com/awtoau/csharp2rust/issues/5), [#8](https://github.com/awtoau/csharp2rust/issues/8), [#10](https://github.com/awtoau/csharp2rust/issues/10), [#11](https://github.com/awtoau/csharp2rust/issues/11), [#12](https://github.com/awtoau/csharp2rust/issues/12), [#13](https://github.com/awtoau/csharp2rust/issues/13), [#14](https://github.com/awtoau/csharp2rust/issues/14), [#16](https://github.com/awtoau/csharp2rust/issues/16), [#32](https://github.com/awtoau/csharp2rust/issues/32), [#33](https://github.com/awtoau/csharp2rust/issues/33), [#38](https://github.com/awtoau/csharp2rust/issues/38), +8 more |
+| `triage:still-valid` | 32 — [#3](https://github.com/awtoau/csharp2rust/issues/3), [#6](https://github.com/awtoau/csharp2rust/issues/6), [#7](https://github.com/awtoau/csharp2rust/issues/7), [#9](https://github.com/awtoau/csharp2rust/issues/9), [#20](https://github.com/awtoau/csharp2rust/issues/20), [#21](https://github.com/awtoau/csharp2rust/issues/21), [#22](https://github.com/awtoau/csharp2rust/issues/22), [#23](https://github.com/awtoau/csharp2rust/issues/23), [#24](https://github.com/awtoau/csharp2rust/issues/24), [#25](https://github.com/awtoau/csharp2rust/issues/25), [#26](https://github.com/awtoau/csharp2rust/issues/26), [#27](https://github.com/awtoau/csharp2rust/issues/27), +20 more |
+| `triage:superseded` | 9 — [#15](https://github.com/awtoau/csharp2rust/issues/15), [#17](https://github.com/awtoau/csharp2rust/issues/17), [#18](https://github.com/awtoau/csharp2rust/issues/18), [#19](https://github.com/awtoau/csharp2rust/issues/19), [#29](https://github.com/awtoau/csharp2rust/issues/29), [#34](https://github.com/awtoau/csharp2rust/issues/34), [#35](https://github.com/awtoau/csharp2rust/issues/35), [#37](https://github.com/awtoau/csharp2rust/issues/37), [#53](https://github.com/awtoau/csharp2rust/issues/53) |
 
 
