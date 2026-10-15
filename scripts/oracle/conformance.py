@@ -30,7 +30,8 @@ def write_csharp_runner(case: Path, source: Path, type_name: str) -> None:
 """)
     shutil.copy2(source, case / source.name)
     (case / "Xunit.cs").write_text(
-        "namespace Xunit { public sealed class FactAttribute : System.Attribute {} }\n")
+        "namespace Xunit { public sealed class FactAttribute : System.Attribute {} }\n"
+        "public sealed class OuterLoopAttribute : System.Attribute {}\n")
     (case / "Program.cs").write_text(
         f"System.Console.WriteLine({type_name}.TestEntryPoint());\n")
 

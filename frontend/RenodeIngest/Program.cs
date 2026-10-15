@@ -119,6 +119,8 @@ public static class Program
                     [System.AttributeUsage(System.AttributeTargets.Method)]
                     public sealed class FactAttribute : System.Attribute {}
                 }
+                [System.AttributeUsage(System.AttributeTargets.All)]
+                public sealed class OuterLoopAttribute : System.Attribute {}
                 """, path: "<conformance-stubs>");
             var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
             if (string.IsNullOrEmpty(tpa))
