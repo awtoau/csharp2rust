@@ -9,7 +9,7 @@ detect drift, and reports absence as absence rather than omitting a row.
 Every figure is derived from committed evidence or live tooling; nothing is
 hand-maintained. A row reading "not started" is a real answer.
 
-Run:  python3 scripts/scorecard.py [--check]
+Run:  python3 scripts/reports/scorecard.py [--check]
       --check exits 1 if STATUS.md is stale (for CI)
 Log:  ./tmp/logs/scorecard.log
 """
@@ -240,7 +240,7 @@ def build(root: Path) -> str:
     a = L.append
     a("# renode-rs — scorecard")
     a("")
-    a(f"Generated {now} from `{commit}` by `scripts/scorecard.py`. **Do not edit by hand.**")
+    a(f"Generated {now} from `{commit}` by `scripts/reports/scorecard.py`. **Do not edit by hand.**")
     a("")
     a("Leading with the metrics that detect drift, not the ones that flatter it —")
     a('"files translated" is exactly what looked healthy in `linux-rs` while its rules')
@@ -701,7 +701,7 @@ def main() -> int:
 
     if args.check:
         if body(fresh) != body(current):
-            log.error("%s is stale -- run scripts/scorecard.py", OUT)
+            log.error("%s is stale -- run scripts/reports/scorecard.py", OUT)
             return 1
         log.info("%s is current", OUT)
         return 0
