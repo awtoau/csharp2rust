@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T19:56:28+11:00 from `ea6d9b2` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-15T20:30:23+11:00 from `87bdc88` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -236,11 +236,11 @@ hybrid host was ~50% from core migration; pinned it is ±2%.
 
 ## Issues
 
-39 open, 47 closed, 86 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
+40 open, 47 closed, 87 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
 
 | phase | open | closed |
 |---|---:|---:|
-| unphased | 39 | 47 |
+| unphased | 40 | 47 |
 
 **By label** (an issue may carry more than one; counts are not additive to the total above):
 

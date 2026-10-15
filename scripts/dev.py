@@ -176,6 +176,11 @@ def cmd_test(extra: list[str]) -> int:
     return run(["cargo", "test", "--workspace", *extra])
 
 
+@command("compare C# TestEntryPoint programs with generated Rust", kind="oracle")
+def cmd_conformance(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/oracle/conformance.py", *extra])
+
+
 @command("pin a Renode release and ingest a verified scratch corpus (issue #80)",
          kind="action")
 def cmd_sync_renode(extra: list[str]) -> int:
