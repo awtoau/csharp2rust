@@ -170,6 +170,12 @@ def cmd_test(extra: list[str]) -> int:
     return run(["cargo", "test", "--workspace", *extra])
 
 
+@command("pin a worktree to an upstream Renode tag and re-ingest its corpus "
+         "into a scratch db (issue #80); requires --tag", kind="oracle")
+def cmd_sync_renode(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/sync_renode.py", *extra])
+
+
 @command("run the fail-fast everyday validation tier", kind="aggregate")
 def cmd_gate(extra: list[str]) -> int:
     return run([sys.executable, "scripts/gates.py", *extra])

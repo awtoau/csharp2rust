@@ -11,8 +11,8 @@ classifier: `core/` (converter and shared library modules), `validation/`
 `analysis/` (census and other reproducible-research scripts), `oracle/`
 (trace acquisition and replay tooling), `reports/` (generated status output).
 A handful of top-level entry points (`dev.py`, `gates.py`, `regenerate.py`,
-`dispatch_spike.py`, `record_translations.py`, `dump_emitted.py`, `rules.py`)
-don't fit one category and stay at `scripts/` directly. `dev.py describe`
+`dispatch_spike.py`, `record_translations.py`, `dump_emitted.py`, `rules.py`,
+`sync_renode.py`) don't fit one category and stay at `scripts/` directly. `dev.py describe`
 discovers commands from every one of these directories, so a script's kind on
 the CLI and its physical directory can differ (`check_generated.py` lives in
 `core/` because `csharp_emitter.py` itself imports it, but is still a `validation` gate
@@ -35,6 +35,10 @@ by kind).
 - `dev.py ci-fast`: full push-tier (`--full`) run with fail-fast enabled.
 - `dev.py ci-determinism`: explicit issue-36 determinism proof run
   (`check_determinism.py` then `check_emit_determinism.py`).
+- `sync_renode.py` (`dev.py sync-renode --tag vX.Y.Z`): pins a worktree to an
+  upstream Renode tag off the shared store and re-ingests its corpus into a
+  scratch db, without touching the canonical `rulesdb/patterns.db`. See
+  issue #80 for the gotchas it papers over (submodule init, TFM override).
 
 ## Validation (`validation/`)
 
