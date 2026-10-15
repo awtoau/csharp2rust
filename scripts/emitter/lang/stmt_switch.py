@@ -19,8 +19,21 @@ the whole handler would make every decline raise.
 
 from __future__ import annotations
 
+import re
+
 from emitter import core
 from emitter.core import must_explain
+
+
+_LIT_CAST = re.compile(
+    r"^\(\s*(-?(?:0x[0-9a-fA-F_]+|[0-9][0-9_]*))\s+as\s+[iu](?:8|16|32|64|128|size)\s*\)$")
+
+
+def _pattern_label(txt: str) -> str:
+    """A literal cast `(0 as i64)` is an expression, not a pattern; the
+    subject's type already fixes the literal's type."""
+    m = _LIT_CAST.match(txt.strip())
+    return m.group(1) if m else txt
 
 
 @core.stmt("Switch")
@@ -78,6 +91,7 @@ def emit_switch(em, oid: int, indent: int) -> list[str]:
                     lab = em.emit_expr(vals[0][0])
                     if enum_ty and lab.endswith(" as u64"):
                         lab = lab[:-len(" as u64")]   # pattern context
+                    lab = _pattern_label(lab)
                     labels.append(lab)
             elif gkind == "Branch":
                 continue          # the mandatory C# break
