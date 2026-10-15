@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T20:30:23+11:00 from `87bdc88` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-15T21:18:17+11:00 from `32af7ba` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -49,7 +49,7 @@ averaged 1.87 validation instances each.
 
 | file | size |
 |---|---:|
-| `rulesdb/rules/csharp_core.json` | 70,341 bytes |
+| `rulesdb/rules/csharp_core.json` | 70,862 bytes |
 | `rulesdb/rules/register_dsl.json` | 64,228 bytes |
 | `rulesdb/rules/bug_rules.json` | 25,985 bytes |
 | `rulesdb/rules/offset_switch.json` | 13,460 bytes |
