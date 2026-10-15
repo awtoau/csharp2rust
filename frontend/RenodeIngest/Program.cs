@@ -196,7 +196,8 @@ public static class Program
         // 'tree' is the canonical corpus -- the whole compilation. 'breadth' is
         // the same files written to a scratch database as a health check, and is
         // refused by every rule/cluster consumer.
-        var written = await Ingest.RunAsync(compilation, trees, dbPath, renodeSrc, commit,
+        var written = await Ingest.RunAsync(compilation, trees, dbPath, renodeSrc,
+                                            "renode", commit,
                                             threads, all ? "breadth" : "tree");
         Console.WriteLine($"\ntotal     {total.Elapsed.TotalSeconds:F1}s");
         return written ? 0 : 1;

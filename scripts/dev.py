@@ -155,6 +155,12 @@ def cmd_build(extra: list[str]) -> int:
                 "--working-set", "--ratchet", *extra])
 
 
+@command("reject ambiguous corpus-run selection in the emitter", kind="validation")
+def cmd_check_corpus_selection(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/validation/check_corpus_selection.py",
+                *extra])
+
+
 @command("point git at scripts/githooks so the pre-commit gates run", kind="action")
 def cmd_install_hooks(_extra: list[str]) -> int:
     return run(["git", "config", "core.hooksPath", "scripts/githooks"])

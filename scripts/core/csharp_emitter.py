@@ -161,6 +161,21 @@ def _load_registered() -> None:
 _load_registered()
 
 
+def select_corpus_run(con: sqlite3.Connection, run_id: int | None) -> int | None:
+    """Select one corpus run or reject an ambiguous database."""
+    if run_id is not None:
+        row = con.execute("SELECT id FROM corpus_run WHERE id=?", (run_id,)).fetchone()
+        if row is None:
+            raise ValueError(f"corpus run {run_id} does not exist")
+        return row[0]
+    rows = con.execute("SELECT id FROM corpus_run ORDER BY id").fetchall()
+    if len(rows) > 1:
+        ids = ", ".join(str(row[0]) for row in rows)
+        raise ValueError(
+            f"database has multiple corpus runs ({ids}); pass --run-id explicitly")
+    return rows[0][0] if rows else None
+
+
 class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions,
               Statements, DispatchTrait, InterfaceTrait, Types, Postcondition,
               Severity):
@@ -175,7 +190,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
     def __init__(self, con: sqlite3.Connection, log: logging.Logger,
                  rules_dir: Path | None = None,
-                 utility_fn_table: dict[str, set[str]] | None = None):
+                 utility_fn_table: dict[str, set[str]] | None = None,
+                 run_id: int | None = None):
         self.con = con
         self.log = log
         self.unhandled: dict[str, int] = {}
@@ -200,8 +216,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         self.normalised: dict[str, set[int]] = {}
         self._enum_slots: set[str] = set()
         self._current_reg: str | None = None
-        run = self.con.execute("SELECT id FROM corpus_run LIMIT 1").fetchone()
-        self._run_id = run[0] if run else None
+        self._run_id = select_corpus_run(self.con, run_id)
         self._params_cache: dict[str, list[str]] = {}
         # The operation tree is immutable for an emitter run. Large types used
         # to execute the identical child query millions of times while walking
@@ -1464,7 +1479,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         if type_name not in self._utility_owner_names:
             self._utility_fn_cache[type_name] = None
             return None
-        scratch = Emitter(self.con, self.log, self._rules_dir)
+        scratch = Emitter(self.con, self.log, self._rules_dir,
+                          run_id=self._run_id)
         text = scratch.emit_utility_file(type_name)
         fns = set(re.findall(r"(?m)^pub fn ([a-z_][a-z0-9_]*)\(", text))
         self._utility_fn_cache[type_name] = fns
@@ -1499,7 +1515,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
 def compute_utility_fn_table(con: sqlite3.Connection,
                              log: logging.Logger,
-                             rules_dir: Path | None = None
+                             rules_dir: Path | None = None,
+                             run_id: int | None = None,
                              ) -> dict[str, set[str]]:
     """Every utility type's emitted fn names, computed once for a whole run.
 
@@ -1513,7 +1530,7 @@ def compute_utility_fn_table(con: sqlite3.Connection,
     from register_owners import utility_owners
     table: dict[str, set[str]] = {}
     for name in utility_owners(con, rules_dir):
-        scratch = Emitter(con, log, rules_dir)
+        scratch = Emitter(con, log, rules_dir, run_id=run_id)
         text = scratch.emit_utility_file(name)
         table[name] = set(re.findall(r"(?m)^pub fn ([a-z_][a-z0-9_]*)\(", text))
     return table
@@ -1550,6 +1567,9 @@ def main() -> int:
     ap.add_argument("--type")
     ap.add_argument("--method")
     ap.add_argument("--db", default="rulesdb/patterns.db")
+    ap.add_argument("--run-id", type=int,
+                    help="corpus run to emit; required when the database has "
+                         "more than one run")
     ap.add_argument("--file", metavar="MODULE",
                     help="emit a complete Rust module to stdout")
     ap.add_argument("--interfaces", action="store_true",
@@ -1588,7 +1608,11 @@ def main() -> int:
     log.addHandler(fh); log.addHandler(sh)
 
     con = sqlite3.connect(root / args.db)
-    em = Emitter(con, log)
+    try:
+        em = Emitter(con, log, run_id=args.run_id)
+    except ValueError as exc:
+        con.close()
+        ap.error(str(exc))
     em.conformance = set(args.conformance)
     unknown = em.conformance - {s.get("id") for s in em.bug_stanzas()}
     if unknown:

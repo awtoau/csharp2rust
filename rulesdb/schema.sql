@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS corpus_run (
     id            INTEGER PRIMARY KEY,
     started_at    TEXT    NOT NULL,   -- ISO 8601 with offset
     finished_at   TEXT,
-    renode_commit TEXT    NOT NULL,
+    source_name   TEXT    NOT NULL,
+    source_revision TEXT  NOT NULL,
     tool_version  TEXT    NOT NULL,   -- ingest tool git describe
     -- Run PURPOSE, not run scope. There is only one scope: the whole Renode
     -- tree (the corpus cut was removed -- docs/decisions/remove-the-cut.md).

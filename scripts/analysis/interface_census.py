@@ -162,7 +162,7 @@ def main() -> int:
     con = sqlite3.connect(f"file:{root / args.db}?mode=ro", uri=True)
     em = Emitter(con, log)
     report = em.interface_report()
-    run = con.execute("SELECT id, renode_commit, config FROM corpus_run "
+    run = con.execute("SELECT id, source_revision, config FROM corpus_run "
                       "ORDER BY id DESC LIMIT 1").fetchone()
 
     by_reason: collections.Counter = collections.Counter()
