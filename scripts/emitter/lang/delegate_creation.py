@@ -42,7 +42,9 @@ def delegate_creation(em, oid):
     for cid, ck, _s, _c, _t in em.children(inner):
         body.extend(em.emit_block(cid, 0) if ck == "Block"
                     else em.emit_stmt(cid, 0))
-    txt = " ".join(l.strip() for l in body).rstrip(";")
+    txt = " ".join(l.strip() for l in body).rstrip(";").strip()
+    if txt and not (txt.startswith("{") and txt.endswith("}")):
+        txt = "{ " + txt + " }"
     return em.language.get("delegates_expr", {}).get(
         "closure", "|{params}| {body}").format(
         params=", ".join(n if n != "_" else "_" for n in names),

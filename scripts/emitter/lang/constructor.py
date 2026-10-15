@@ -87,6 +87,7 @@ _SPEC: dict | None = None
 # field store, and such a line is not an initialiser however plausible it reads.
 _ASSIGN = re.compile(r"^\s*st\.([a-z_][a-z0-9_]*)\s*=\s*(.+);\s*$")
 _MARKER = re.compile(r"/\*\s*(GAP|[A-Z]\w+)\s*\*/")
+_ANNOTATION = re.compile(r"\s*//\s+seq:\d{6}\b")
 
 
 def _repo_root() -> Path:
@@ -228,6 +229,7 @@ def _statement(em, stmt_id: int, params: dict, state_names: set[str],
     before = dict(em.unhandled)
     gaps_before = len(em.gaps)
     lines = em.rewrite_this(em.emit_stmt(stmt_id, 2))
+    semantic = [line for line in lines if not _ANNOTATION.match(line)]
     grew = sum(em.unhandled.values()) - sum(before.values())
     # The kinds THIS statement added, read before the counter is restored: the
     # restore is what stops a withheld statement poisoning the driver's totals,
@@ -236,17 +238,17 @@ def _statement(em, stmt_id: int, params: dict, state_names: set[str],
     em.unhandled.clear()
     em.unhandled.update(before)
     del em.gaps[gaps_before:]
-    if grew or not lines or len(lines) != 1 or _MARKER.search(lines[0]):
+    if grew or not semantic or len(semantic) != 1 or _MARKER.search(semantic[0]):
         return None, g["value_unmapped"].format(
             detail=", ".join(added) or "it emitted no single statement"), []
-    m = _ASSIGN.match(lines[0])
+    m = _ASSIGN.match(semantic[0])
     if not m or m.group(1) != field:
-        return None, g["shape_changed"].format(emitted=lines[0].strip()[:60]), []
-    unknown = sorted({x for x in re.findall(r"\bst\.([a-z_][a-z0-9_]*)", lines[0])
+        return None, g["shape_changed"].format(emitted=semantic[0].strip()[:60]), []
+    unknown = sorted({x for x in re.findall(r"\bst\.([a-z_][a-z0-9_]*)", semantic[0])
                       if x != "f" and x not in state_names})
     if unknown:
         return None, g["no_storage"].format(field=", ".join(unknown)), []
-    return lines[0], None, reads
+    return semantic[0], None, reads
 
 
 def _one(em, type_name: str, mid: int, key: str, name: str,

@@ -43,8 +43,14 @@ def constant_field(em, oid):
     # into the generated source, which is not a wrong value but a token
     # rustc refuses to parse at all.
     if rtype in ("char", "string"):
-        return em.literal(const, rtype)
-    return spec["emit"].format(value=const)
+        return em.annotate_fragment(
+            em.literal(const, rtype),
+            "lang:references:ConstantField"
+        )
+    return em.annotate_fragment(
+        spec["emit"].format(value=const),
+        "lang:references:ConstantField"
+    )
 
 
 def declaring_type_kind(em, symbol: str) -> str | None:

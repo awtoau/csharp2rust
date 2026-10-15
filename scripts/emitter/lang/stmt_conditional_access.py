@@ -51,6 +51,9 @@ def conditional_access_stmt(em, oid: int, indent: int) -> list[str] | None:
         em._ca_binding = prev
         head = spec["emit"].split("\n")[0].format(
             receiver=recv, body="")
-        return [pad + head.replace("Some(x)", "Some(__v)"),
-                *body, pad + "}"]
+        return em.annotate_fragment(
+            "\n".join([pad + head.replace("Some(x)", "Some(__v)"),
+                       *body, pad + "}"]),
+            "lang:normalisation:ConditionalAccessStatement"
+        ).splitlines()
     return None

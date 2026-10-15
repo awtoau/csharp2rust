@@ -717,7 +717,7 @@
     "register_note": "A register-level callback has no bit position, and formatting None into the name gave `status_None_writer` -- a name that reads like a bug and is not derived from anything."
   },
   "logging": {
-    "note": "Renode's `this.Log(LogLevel.X, format, args...)`. A STATIC extension on IEmulationElement, so argument 0 is the peripheral and argument 1 the level -- binding from the front would log at level `self`. Kept out of `expressions` because it needs the level argument decoded, which a flat template cannot express.",
+    "note": "Renode's `this.Log(LogLevel.X, format, args...)` (a STATIC extension on IEmulationElement, so argument 0 is the peripheral and argument 1 the level) and the plain static `Logger.Log(LogLevel.X, format, args...)` (no receiver) share this symbol prefix; the emitter tells them apart by the first parameter's type. Kept out of `expressions` because it needs the level argument decoded, which a flat template cannot express.",
     "symbol_contains": "Logging.Logger.Log(",
     "emit": "log::{level}!({args})",
     "default_level": "info",

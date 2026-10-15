@@ -123,18 +123,30 @@ class Expressions:
         forms = self.language.get("references", {}).get(kind, {})
         key = self.stdlib_member(symbol)
         if key and kids:
-            return self.language["stdlib"]["members"][key].format(
-                recv=self.emit_expr(kids[0]), args="")
+            return self.annotate_fragment(
+                self.language["stdlib"]["members"][key].format(
+                    recv=self.emit_expr(kids[0]), args=""),
+                f"lang:stdlib:{key}"
+            )
         name = snake(symbol.split(".")[-1].split("(")[0])
         if not kids:
             # No receiver child: a static reference, or `this` left implicit.
-            return forms.get("self", "self.{name}").format(name=name)
+            return self.annotate_fragment(
+                forms.get("self", "self.{name}").format(name=name),
+                f"lang:references:{kind}"
+            )
         rid = kids[0]
         rkind = self.kind_of(rid)
         if rkind == "InstanceReference":
-            return forms.get("self", "self.{name}").format(name=name)
-        return forms.get("instance", "{receiver}.{name}").format(
-            receiver=self.emit_expr(rid), name=name)
+            return self.annotate_fragment(
+                forms.get("self", "self.{name}").format(name=name),
+                f"lang:references:{kind}"
+            )
+        return self.annotate_fragment(
+            forms.get("instance", "{receiver}.{name}").format(
+                receiver=self.emit_expr(rid), name=name),
+            f"lang:references:{kind}"
+        )
 
     def csharp_format(self, text: str) -> str:
         """C# composite format to Rust. `{0:X}` -> `{:X}`, `{1:X8}` -> `{:08X}`.
@@ -145,15 +157,17 @@ class Expressions:
         table = spec.get("specs", {})
 
         def one(m):
+            idx = m.group(1)
             fmt = m.group(2) or ""
             if not fmt:
-                return "{}"
+                return "{" + idx + "}"
             kind, digits = fmt[0], fmt[1:]
             mapped = table.get(kind, kind)
             if digits.isdigit() and mapped:
-                return "{:" + spec.get("padded_hex", "0{width}{spec}").format(
-                    width=digits, spec=mapped) + "}"
-            return "{:" + mapped + "}" if mapped else "{}"
+                rspec = spec.get("padded_hex", "0{width}{spec}").format(
+                    width=digits, spec=mapped)
+                return "{" + idx + ":" + rspec + "}"
+            return ("{" + idx + ":" + mapped + "}") if mapped else ("{" + idx + "}")
 
         return re.sub(r"\{(\d+)(?::([^}]*))?\}", one, text)
 

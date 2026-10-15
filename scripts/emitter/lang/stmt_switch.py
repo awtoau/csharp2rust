@@ -62,6 +62,7 @@ def emit_switch(em, oid: int, indent: int) -> list[str]:
                             "{enum}::from_u64({subject})").format(
             enum=enum_ty, subject=subject)
     out = [pad + rules.get("match", "match {subject} {{").format(subject=subject)]
+    switch_value = "__switch_v"
     saw_default = False
     for cid, ckind, _s, _c, _t in kids[1:]:
         if ckind != "SwitchCase":
@@ -85,8 +86,13 @@ def emit_switch(em, oid: int, indent: int) -> list[str]:
                 body.extend(em.emit_stmt(gid, indent + 2))
         if not labels:
             labels = [rules.get("default_label", "_")]
+        if labels == [rules.get("default_label", "_")]:
+            arm_label = rules.get("default_label", "_")
+        else:
+            cond = " || ".join(f"{switch_value} == {lab}" for lab in labels)
+            arm_label = f"{switch_value} if {cond}"
         out.append(pad + "    " + rules.get("arm", "{labels} => {{").format(
-            labels=rules.get("label_sep", " | ").join(labels)))
+            labels=arm_label))
         out.extend(body)
         out.append(pad + "    }")
     if not saw_default:

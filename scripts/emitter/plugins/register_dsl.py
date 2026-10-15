@@ -457,7 +457,8 @@ class RegisterDsl:
         # whose output does not match its own declared shape is a defect in the
         # rule or in this method, never a fact about the corpus, so recording it
         # as a gap would file it under the wrong heading and keep going.
-        return self.assert_postcondition(rule, text)
+        text = self.assert_postcondition(rule, text)
+        return self.annotate_fragment(text, f"rule:{rule['name']}")
 
     def emit_callbacks(self, oid: int, name: str, env: dict, rule: dict,
                        bound: list[str], template: str | None) -> dict[str, str]:
@@ -1375,7 +1376,7 @@ class RegisterDsl:
                             # and every `with_flag` against it failed to
                             # compile. The elements decide the array's type.
                             self._flag_fields.add(f.partition("[")[0])
-                    body.append(line)
+                    body.extend(line.splitlines())
                 self._loop_env = {}
             if skipped:
                 gaps.append(

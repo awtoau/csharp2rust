@@ -54,4 +54,4 @@ def utility_call(em, oid):
         return None
     args = [c for c in em.children(oid) if c[1] == "Argument"]
     arg_txt = ", ".join(em.emit_expr(a[0]) for a in args)
-    return f"{module_name(declaring)}::{fname}({arg_txt})"
+    return f"crate::{module_name(declaring)}::{fname}({arg_txt})"

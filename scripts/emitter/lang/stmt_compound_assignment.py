@@ -99,9 +99,12 @@ def compound_assignment_stmt(em, oid: int, indent: int) -> list[str] | None:
                 current = em.emit_expr(kids[0][0])
                 value = em.emit_expr(kids[1][0])
                 new_value = f"({current} {op} {value})"
-                return [pad + rule["emit"].format(
-                    field=em.receiver_field(kids[0][0]) or "UNKNOWN",
-                    value=new_value)]
+                return [pad + line for line in em.annotate_fragment(
+                    rule["emit"].format(
+                        field=em.receiver_field(kids[0][0]) or "UNKNOWN",
+                        value=new_value),
+                    f"rule:{rule.get('name', 'compound_assignment')}"
+                ).splitlines()]
         return [pad + spec.get("template", "{target} {op}= {value};")
                 .format(target=em.emit_expr(kids[0][0]), op=op,
                         value=em.emit_expr(kids[1][0]))]
