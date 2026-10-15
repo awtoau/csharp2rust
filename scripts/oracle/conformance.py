@@ -62,23 +62,26 @@ def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
         return None
 
 
-def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, str, str]:
-    source = source_dir / f"{type_name}.cs"
-    case = cases / type_name
+def run_case(entry: tuple[str, str], source_dir: Path, db: Path,
+             cases: Path) -> tuple[str, str, str]:
+    type_name, relative_source = entry
+    source = source_dir / relative_source
+    case_name = relative_source.replace("/", "__").removesuffix(".cs")
+    case = cases / case_name
     case.mkdir()
     write_csharp_runner(case, source, type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
     if csharp is None:
-        return type_name, "source_failed", "C# entry point did not produce an integer"
+        return relative_source, "source_failed", "C# entry point did not produce an integer"
     emission = run([
         sys.executable, str(EMITTER), "--db", str(db),
         "--type", type_name, "--method", "TestEntryPoint", "--static-function",
     ], ROOT)
     if emission.returncode or not emission.stdout.strip():
-        return type_name, "withheld", emission.stderr.strip() or "no emitted Rust"
+        return relative_source, "withheld", emission.stderr.strip() or "no emitted Rust"
     write_rust_runner(case, emission.stdout)
     rust = output_value(run(["cargo", "run", "--quiet"], case))
-    return type_name, "agreed" if rust == csharp else "disagreed", ""
+    return relative_source, "agreed" if rust == csharp else "disagreed", ""
 
 
 def main() -> int:
@@ -107,11 +110,12 @@ def main() -> int:
         return 1
 
     con = sqlite3.connect(db)
-    types = [row[0] for row in con.execute(
-        """SELECT t.name FROM type t JOIN member mb ON mb.type_id=t.id
+    types = [row for row in con.execute(
+        """SELECT t.name, f.path FROM type t JOIN member mb ON mb.type_id=t.id
            JOIN method m ON m.member_id=mb.id
+           JOIN file f ON f.id=t.file_id
            WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
-           ORDER BY t.name""")]
+           ORDER BY f.path, t.name""")]
     con.close()
     cases = work / "cases"
     shutil.rmtree(cases, ignore_errors=True)
@@ -120,7 +124,7 @@ def main() -> int:
         ap.error("--jobs must be positive")
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         results = list(pool.map(
-            lambda name: run_case(name, source_dir, db, cases), types))
+            lambda entry: run_case(entry, source_dir, db, cases), types))
     results.sort()
     counts = {status: sum(1 for _name, found, _reason in results if found == status)
               for status in ("agreed", "disagreed", "withheld", "source_failed")}
