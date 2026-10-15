@@ -10,6 +10,15 @@ def throw_stmt(em, oid: int, indent: int) -> list[str] | None:
     if not getattr(em, "_emitting_conformance", False):
         return None
     children = em.children(oid)
+    if not children:
+        caught = getattr(em, "_caught_exception_name", None)
+        if not caught:
+            return None
+        pad = "    " * indent
+        return [
+            f"{pad}// C# throw;: rethrow the active managed exception.",
+            f"{pad}csharp_rt::rethrow({caught});",
+        ]
     if len(children) != 1:
         return None
     exception_id = children[0][0]

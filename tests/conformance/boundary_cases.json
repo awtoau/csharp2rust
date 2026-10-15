@@ -21,5 +21,8 @@
       "thrown": "System.ArgumentException",
       "caught": "System.ArgumentException"
     }
+  ],
+  "rethrow_exception_types": [
+    "System.ArgumentException"
   ]
 }
