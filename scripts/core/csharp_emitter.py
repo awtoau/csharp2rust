@@ -41,17 +41,22 @@ Log:  ./tmp/logs/emit.log
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import re
 import sqlite3
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 def repo_root() -> Path:
     return Path(subprocess.run(["git", "rev-parse", "--show-toplevel"],
                                capture_output=True, text=True, check=True).stdout.strip())
+
+
+ANNOTATION_DB = Path("tmp") / "logs" / "emit-annotate.sqlite3"
 
 
 
@@ -175,7 +180,11 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
 
     def __init__(self, con: sqlite3.Connection, log: logging.Logger,
                  rules_dir: Path | None = None,
-                 utility_fn_table: dict[str, set[str]] | None = None):
+                 utility_fn_table: dict[str, set[str]] | None = None,
+                 annotate_rules: bool = False,
+                 db_path: Path | None = None,
+                 annotation_db_path: Path | None = None,
+                 record_annotation_db: bool = True):
         self.con = con
         self.log = log
         self.unhandled: dict[str, int] = {}
@@ -189,6 +198,17 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         # the same corpus -- see utility_module_functions below. `None` here
         # means "no table was handed in", not "computed as empty".
         self._utility_fn_table = utility_fn_table
+        self.annotate_rules = annotate_rules
+        self._annotate_seq = 0
+        self._generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        self._repo_root = repo_root()
+        self._db_path = db_path
+        self._db_hash: str | None = None
+        self._annotation_db_path = annotation_db_path or ANNOTATION_DB
+        self._record_annotation_db = record_annotation_db
+        self._annotate_db: sqlite3.Connection | None = None
+        self._current_module: str | None = None
+        self._current_method: str | None = None
         self._flag_fields: set[str] = set()
         self._callbacks: list[str] = []
         self._callback_fn_names: set[str] = set()
@@ -244,6 +264,145 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
                 for k, v in doc.items():
                     if k not in self.NOT_RULES:
                         self.project[k] = v
+        self._init_annotation_store()
+
+    def _init_annotation_store(self) -> None:
+        """Create a fresh per-run provenance database when annotations are on."""
+        if not self.annotate_rules or not self._record_annotation_db:
+            return
+        path = self._repo_root / self._annotation_db_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            path.unlink()
+        self._annotate_db = sqlite3.connect(path)
+        self._annotate_db.executescript("""
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            CREATE TABLE emission_run (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                generated_at TEXT NOT NULL,
+                repo_root TEXT NOT NULL,
+                db_path TEXT,
+                db_sha256 TEXT,
+                annotation_db_path TEXT NOT NULL
+            );
+            CREATE TABLE emission_event (
+                seq INTEGER PRIMARY KEY,
+                generated_at TEXT NOT NULL,
+                module TEXT,
+                type_name TEXT,
+                method_name TEXT,
+                register_name TEXT,
+                line TEXT NOT NULL
+            );
+            CREATE TABLE emission_event_tag (
+                seq INTEGER NOT NULL,
+                ord INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (seq, ord),
+                FOREIGN KEY (seq) REFERENCES emission_event(seq) ON DELETE CASCADE
+            );
+            CREATE INDEX idx_emission_event_module ON emission_event(module);
+            CREATE INDEX idx_emission_event_type_method ON emission_event(type_name, method_name);
+            CREATE INDEX idx_emission_event_tag_tag ON emission_event_tag(tag);
+        """)
+        self._annotate_db.execute(
+            "INSERT INTO emission_run(id, generated_at, repo_root, db_path, db_sha256, annotation_db_path) "
+            "VALUES (1, ?, ?, ?, ?, ?)",
+            (
+                self._generated_at,
+                str(self._repo_root),
+                str(self._db_path) if self._db_path else None,
+                self.db_hash(),
+                str(self._annotation_db_path),
+            ),
+        )
+        self._annotate_db.commit()
+
+    def annotate_fragment(self, text: str, *labels: str) -> str:
+        """Inline provenance comments before each influenced output line.
+
+        Comments are opt-in because most generated Rust should stay readable,
+        and some downstream checks compare it byte-for-byte. When enabled, each
+        non-blank emitted line gets the same comment block immediately before
+        it so a human reading the file does not have to look elsewhere.
+        """
+        if not self.annotate_rules or not text:
+            return text
+        tags = [lab for lab in labels if lab]
+        if not tags:
+            return text
+        out: list[str] = []
+        for line in text.splitlines():
+            if not line.strip():
+                out.append(line)
+                continue
+            if line.lstrip().startswith("// "):
+                out.append(line)
+                continue
+            self._annotate_seq += 1
+            seq = self._annotate_seq
+            out.extend(f"// seq:{seq:06d} {tag}" for tag in tags)
+            self._record_annotation(seq, tags, line)
+            out.append(line)
+        return "\n".join(out)
+
+    def strip_annotation_lines(self, text: str) -> str:
+        """Remove inline provenance comment lines from generated text.
+
+        Some structural checks operate on code text patterns (`st.*`, `self.*`)
+        and should ignore annotation-only comment lines.
+        """
+        kept = [line for line in text.splitlines()
+                if not line.lstrip().startswith("// seq:")]
+        return "\n".join(kept)
+
+    def diagnostic_inline(self, text: str, limit: int = 120) -> str:
+        """Render diagnostic text as one safe line without dropping content."""
+        single = re.sub(r"\s+", " ", text).strip()
+        return single[:limit]
+
+    def _record_annotation(self, seq: int, tags: list[str], line: str) -> None:
+        """Record provenance events in a fresh per-run SQLite store."""
+        if not self.annotate_rules or self._annotate_db is None:
+            return
+        self._annotate_db.execute(
+            "INSERT INTO emission_event(seq, generated_at, module, type_name, method_name, register_name, line) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                seq,
+                self._generated_at,
+                self._current_module,
+                self._current_type,
+                self._current_method,
+                self._current_reg,
+                line,
+            ),
+        )
+        self._annotate_db.executemany(
+            "INSERT INTO emission_event_tag(seq, ord, tag) VALUES (?, ?, ?)",
+            [(seq, i, tag) for i, tag in enumerate(tags)],
+        )
+
+    def close_annotation_store(self) -> None:
+        if self._annotate_db is None:
+            return
+        self._annotate_db.commit()
+        self._annotate_db.close()
+        self._annotate_db = None
+
+    def db_hash(self) -> str | None:
+        """SHA256 of the corpus DB backing this emission, computed lazily once."""
+        if self._db_hash is not None:
+            return self._db_hash
+        if not self._db_path:
+            return None
+        h = hashlib.sha256()
+        with self._db_path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                h.update(chunk)
+        self._db_hash = h.hexdigest()
+        return self._db_hash
 
     def params(self, symbol: str) -> list[str]:
         """Parameter names of the callee, in order."""
@@ -401,6 +560,10 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
                     name=m.group(1), args=(", " + inner) if inner else ""))
                 i = j
             line = "".join(out_chars)
+            # Bare `self` in free-function bodies is the captured C# receiver.
+            # Keep method calls (`self.foo(`) and module paths (`self::foo`) for
+            # the dedicated rewrites below; rewrite value-position `self` to `st`.
+            line = re.sub(r"\bself\b(?![\.:])", "st", line)
             line = line.replace("self.", "st.")
             rewritten.append(line)
         return rewritten
@@ -519,8 +682,11 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
                 continue
             if rule.get("target_type_is") and ttype != rule["target_type_is"]:
                 continue
-            return rule["emit"].format(
-                field=self.receiver_field(target_id) or "UNKNOWN", value=value)
+            return self.annotate_fragment(
+                rule["emit"].format(
+                    field=self.receiver_field(target_id) or "UNKNOWN", value=value),
+                f"rule:{rule.get('name', 'assignment')}"
+            )
 
         tmpl = self.language.get("statements", {}).get(
             "SimpleAssignment", {}).get("default", "{target} = {value};")
@@ -580,6 +746,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         boundary rather than a convention -- which is what lets check_generated.py
         enforce it byte-for-byte.
         """
+        self._current_module = module
+        self._current_method = method_name
         # The offset enum is never declared as a Rust enum (it is `mod reg`
         # instead -- see the exclusion below), so a peer method's reference to
         # it must resolve there too. `register_offsets` is a read-only corpus
@@ -691,6 +859,13 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         self._emitted_fns = set(emitted)
         self.gaps = []
         stmts, fields, gaps = self.emit_registers(type_name, method_name)
+        if any(re.search(r"\bself\b", line) for line in stmts):
+            gaps.append(
+                f"{method_name}: withheld register layout body still references "
+                f"implicit `this` (`self` in Rust), which has no receiver in "
+                f"`define_registers`"
+            )
+            stmts = []
         # Constructors. Last, so a statement it withholds cannot disturb the
         # counters the method and layout paths above read. Its own module owns
         # the decision about what a constructor can and cannot become.
@@ -736,6 +911,12 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         a(f"//! in `rulesdb/rules/` or the C# it is derived from.")
         a("//!")
         a(f"//! Source: {type_name}.{method_name}")
+        if self.annotate_rules:
+            a("//!")
+            a(f"//! Annotated: {self._generated_at}")
+            a(f"//! Corpus DB: {self._db_path}")
+            a(f"//! Corpus DB SHA256: {self.db_hash()}")
+            a(f"//! Annotation DB: {self._annotation_db_path}")
         if gaps:
             a("//!")
             a("//! GAPS the converter reports rather than guessing:")
@@ -1127,6 +1308,10 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
     def fn_name(self, method_name: str) -> str:
         """Emitted function name. Property accessors lose their get_/set_ prefix
         so they match the PropertyReference call sites."""
+        # Roslyn records an explicit interface implementation as
+        # `Namespace.Interface.Member`. Rust function names cannot contain
+        # dots, and call sites resolve the same member by its leaf name.
+        method_name = method_name.split(".")[-1]
         for pre in (self.project.get("peripheral_methods", {})
                     .get("accessor_names", {}).get("strip_prefixes", [])):
             if method_name.startswith(pre):
@@ -1149,6 +1334,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         # Do not let a previously emitted method's ref/out context leak into a
         # method that returns early while resolving its signature.
         self._by_ref_params = set()
+        self._current_type = type_name
+        self._current_method = method_name
         row = self.con.execute("""
             SELECT m.member_id, m.return_type FROM method m
             JOIN member mb ON mb.id = m.member_id
@@ -1271,14 +1458,26 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
             self.gaps.append(
                 f"{method_name}: withheld, cannot emit {', '.join(new)}")
             return []
+        body_semantic = [self.strip_annotation_lines(line) for line in body]
+        body_text = "\n".join(body_semantic)
         # Any emitted marker, not just `/* GAP`. An unhandled expression emits
         # `/* Kind */`, which is valid Rust in some positions and invalid in
         # others -- either way it is not a translation.
-        marker = [l.strip() for l in body if re.search(r"/\*\s*(GAP|[A-Z]\w+)\s*\*/", l)]
+        marker_idx = next((i for i, l in enumerate(body)
+                   if re.search(r"/\*\s*(GAP(?:\s*:[^*]*)?|[A-Z]\w+)\s*\*/", l)),
+                          None)
+        marker = None
+        if marker_idx is not None:
+            start = marker_idx
+            while start > 0 and body[start - 1].lstrip().startswith("// seq:"):
+                start -= 1
+            marker = self.diagnostic_inline(" | ".join(
+                line.strip() for line in body[start:marker_idx + 1]
+            ))
         if marker:
             self.gaps.append(
                 f"{method_name}: withheld, body still contains a gap marker "
-                f"({marker[0][:60]})")
+                f"({marker})")
             return []
         if static:
             body = self.rewrite_static(body)
@@ -1291,7 +1490,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
             # `st.field`, and the unknown-state check below withholds it) but
             # this method has no `st` to send it to at all.
             leftover = sorted({m for m in re.findall(
-                r"\bself\.([a-z_][a-z0-9_]*)", "\n".join(body))})
+                r"\bself\.([a-z_][a-z0-9_]*)", body_text)})
             if leftover:
                 self.gaps.append(
                     f"{method_name}: withheld, references static field(s) with "
@@ -1303,7 +1502,7 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
                     *body, "}"]
         body = self.rewrite_this(body)
         unknown = sorted({m for m in re.findall(
-            r"\bst\.([a-z_][a-z0-9_]*)", "\n".join(body))
+            r"\bst\.([a-z_][a-z0-9_]*)", body_text)
             if m != "f" and m not in self._state_names})
         if unknown:
             self.gaps.append(
@@ -1317,9 +1516,9 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         # by the time rustc said so.
         for sub in getattr(self, "_sub_fields", {}).values():
             hits = sorted(set(re.findall(
-                rf"\bfor\s+(\w+)\s+in\s+st\.{sub['field']}\b", "\n".join(body))))
+                rf"\bfor\s+(\w+)\s+in\s+st\.{sub['field']}\b", body_text)))
             calls = [m for h in hits for m in re.findall(
-                rf"\b{h}\.([a-z_][a-z0-9_]*)\(", "\n".join(body))]
+                rf"\b{h}\.([a-z_][a-z0-9_]*)\(", body_text)]
             if calls:
                 self.gaps.append(
                     f"{method_name}: withheld, calls {', '.join(sorted(set(calls)))} "
@@ -1342,6 +1541,8 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         the cross-module branch in emitter/lang/invocation.py.
         """
         self.take_type_warnings()
+        self._current_module = snake(type_name)
+        self._current_method = None
         self._sub_fields = {}
         self._state_names = set()
         self._state_types = {}
@@ -1398,6 +1599,12 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         a("//! Do not edit: `scripts/check_generated.py` fails the commit if this")
         a("//! file differs from converter output. To change it, change the rules")
         a("//! in `rulesdb/rules/` or the C# it is derived from.")
+        if self.annotate_rules:
+            a("//!")
+            a(f"//! Annotated: {self._generated_at}")
+            a(f"//! Corpus DB: {self._db_path}")
+            a(f"//! Corpus DB SHA256: {self.db_hash()}")
+            a(f"//! Annotation DB: {self._annotation_db_path}")
         if gaps:
             a("//!")
             a("//! GAPS the converter reports rather than guessing:")
@@ -1447,6 +1654,9 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
         return fns
 
     def emit_method(self, type_name: str, method_name: str) -> list[str]:
+        self._current_module = None
+        self._current_type = type_name
+        self._current_method = method_name
         row = self.con.execute("""
             SELECT m.member_id FROM method m
             JOIN member mb ON mb.id = m.member_id
@@ -1526,6 +1736,12 @@ def main() -> int:
     ap.add_argument("--type")
     ap.add_argument("--method")
     ap.add_argument("--db", default="rulesdb/patterns.db")
+    ap.add_argument("--annotate-rules", action="store_true", default=True,
+                    help="inline provenance comments before each emitted line "
+                         "that comes from a named rule or rule-like project hook")
+    ap.add_argument("--no-annotate-rules", dest="annotate_rules",
+                    action="store_false",
+                    help="disable inline provenance comments")
     ap.add_argument("--file", metavar="MODULE",
                     help="emit a complete Rust module to stdout")
     ap.add_argument("--interfaces", action="store_true",
@@ -1563,8 +1779,9 @@ def main() -> int:
     sh = logging.StreamHandler(sys.stdout); sh.setFormatter(fmt)
     log.addHandler(fh); log.addHandler(sh)
 
-    con = sqlite3.connect(root / args.db)
-    em = Emitter(con, log)
+    db_path = root / args.db
+    con = sqlite3.connect(db_path)
+    em = Emitter(con, log, annotate_rules=args.annotate_rules, db_path=db_path)
     em.conformance = set(args.conformance)
     unknown = em.conformance - {s.get("id") for s in em.bug_stanzas()}
     if unknown:
@@ -1576,6 +1793,7 @@ def main() -> int:
                  f"{', '.join(sorted(unknown))}")
     if args.interfaces:
         text, report = em.emit_interface_traits()
+        em.close_annotation_store()
         con.close()
         sys.stdout.write(text)
         done = sum(1 for r in report if r["complete"])
@@ -1588,6 +1806,7 @@ def main() -> int:
     if args.dispatch:
         text, report = em.emit_dispatch_traits(
             dispatch_targets(em), em.project.get("dispatch", {}))
+        em.close_annotation_store()
         con.close()
         sys.stdout.write(text)
         traits = [r for r in report if r["methods"]]
@@ -1599,10 +1818,12 @@ def main() -> int:
         return 0
     if args.file:
         text = em.emit_file(args.type, args.method, args.file)
+        em.close_annotation_store()
         con.close()
         sys.stdout.write(text)
         return 0
     lines = em.emit_method(args.type, args.method)
+    em.close_annotation_store()
     con.close()
 
     log.info("// generated from %s.%s", args.type, args.method)

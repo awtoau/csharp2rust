@@ -34,7 +34,22 @@ def invocation(em, oid):
     # Generic call. Project rules were tried above, so reaching here
     # means no idiom claimed it.
     inv = em.language.get("invocations", {})
-    method = snake(symbol.split("(")[0].split(".")[-1])
+    raw_method = symbol.split("(")[0].split(".")[-1]
+    if "<" in raw_method:
+        # Roslyn's recorded symbol is the unbound generic method definition
+        # (`GetExternalsOfType<T>`, literal `T`, never the constructed type
+        # argument a call site actually used) -- snake-casing it verbatim
+        # produced `get_externals_of_type<t>`, which is not even a valid
+        # method name, let alone one Rust would accept generic arguments on.
+        # Withhold rather than guess a type argument this corpus row does not
+        # carry.
+        bare_name = raw_method.split("<")[0]
+        reason = f"GenericInvocation:{bare_name}"
+        em.unhandled[f"expr:{reason}"] = em.unhandled.get(f"expr:{reason}", 0) + 1
+        em.gaps.append(
+            f"generic call `{bare_name}<...>` has no resolved type argument to emit")
+        return f"/* {reason} */"
+    method = snake(raw_method)
     rendered_args = [em.emit_expr(a[0]) for a in args]
     # Preserve ref/out at call boundaries too.  Roslyn's invocation symbol is
     # the same key stored for an in-corpus member, so this is semantic lookup,
@@ -80,7 +95,10 @@ def invocation(em, oid):
                 em, "_stmt_position", False):
             em.unhandled["expr:DelegateInvokeInExpression"] = 1
             return "/* DelegateInvokeInExpression */"
-        return tmpl.format(recv=em.emit_expr(receiver), args=arg_txt)
+        return em.annotate_fragment(
+            tmpl.format(recv=em.emit_expr(receiver), args=arg_txt),
+            f"lang:stdlib:{key}"
+        )
 
     # A receiver-less call is not necessarily a call on `this`. Static calls
     # have no receiver too, and treating one as `self.foo()` makes the later
@@ -109,7 +127,13 @@ def invocation(em, oid):
             em._operation_kind_cache[receiver] = row[0] if row else None
         rkind = em._operation_kind_cache[receiver]
     if receiver is None or rkind == "InstanceReference":
-        return inv.get("self", "self.{method}({args})").format(
-            method=method, args=arg_txt)
-    return inv.get("instance", "{receiver}.{method}({args})").format(
-        receiver=em.emit_expr(receiver), method=method, args=arg_txt)
+        return em.annotate_fragment(
+            inv.get("self", "self.{method}({args})").format(
+                method=method, args=arg_txt),
+            "lang:invocations:self"
+        )
+    return em.annotate_fragment(
+        inv.get("instance", "{receiver}.{method}({args})").format(
+            receiver=em.emit_expr(receiver), method=method, args=arg_txt),
+        "lang:invocations:instance"
+    )

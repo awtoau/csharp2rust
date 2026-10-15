@@ -93,11 +93,11 @@ from typing import NamedTuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for `emitter`
 
-#: Use the CPUs actually available to this process. On the development machine
-#: one of the 32 logical CPUs is offline, so this correctly returns 31 instead
-#: of creating a worker that can never run.
+#: The repository's fixed parallel default. Deliberately NOT host-dependent:
+#: changing worker count with machine state makes timing and validation choices
+#: drift for no project reason.
 def default_jobs() -> int:
-    return os.cpu_count() or 1
+    return 32
 
 
 class Emitted(NamedTuple):
@@ -173,7 +173,9 @@ def _emit_one(task: tuple[str, str, str]) -> Emitted:
     c0 = time.process_time()
     try:
         em = Emitter(sqlite3.connect(_DB_URI, uri=True), _quiet_log(),
-                    utility_fn_table=_UTILITY_FN_TABLE)
+                    utility_fn_table=_UTILITY_FN_TABLE,
+                    annotate_rules=False,
+                    record_annotation_db=False)
         # The serial drivers swallowed emitter chatter on stderr; keep doing
         # that, or 31 workers interleave it into an unreadable mess.
         with contextlib.redirect_stderr(io.StringIO()):
@@ -197,7 +199,8 @@ def _probe_one(name: str) -> tuple[str, list[str]]:
     """
     from csharp_emitter import Emitter
     from emitter.plugins.sub_blocks import sub_blocks
-    em = Emitter(sqlite3.connect(_DB_URI, uri=True), _quiet_log())
+    em = Emitter(sqlite3.connect(_DB_URI, uri=True), _quiet_log(),
+                 annotate_rules=False, record_annotation_db=False)
     with contextlib.redirect_stderr(io.StringIO()):
         found, _gaps = sub_blocks(em, name)
     return name, sorted({s["child"] for s in found})
@@ -333,7 +336,7 @@ def report_tail(results: Sequence[Emitted], log: logging.Logger,
 def add_jobs_arg(ap) -> None:
     """`-j` with the same meaning everywhere. Used by the census scripts."""
     ap.add_argument("-j", "--jobs", type=int, default=default_jobs(),
-                    help="emit workers (default: all cores; 1 = serial, "
+                    help="emit workers (default: 32; 1 = serial, "
                          "no pool)")
     ap.add_argument("--no-lpt", action="store_true",
                     help="issue tasks in task order instead of longest-first; "
