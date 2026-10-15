@@ -1572,6 +1572,8 @@ def main() -> int:
                          "more than one run")
     ap.add_argument("--file", metavar="MODULE",
                     help="emit a complete Rust module to stdout")
+    ap.add_argument("--static-function", action="store_true",
+                    help="emit --type/--method as a pure static Rust function")
     ap.add_argument("--interfaces", action="store_true",
                     help="emit every C# interface that can be a COMPLETE Rust "
                          "trait, to stdout")
@@ -1649,6 +1651,11 @@ def main() -> int:
         text = em.emit_file(args.type, args.method, args.file)
         con.close()
         sys.stdout.write(text)
+        return 0
+    if args.static_function:
+        lines = em.emit_peripheral_method(args.type, args.method, static=True)
+        con.close()
+        sys.stdout.write("\n".join(lines) + ("\n" if lines else ""))
         return 0
     lines = em.emit_method(args.type, args.method)
     con.close()
