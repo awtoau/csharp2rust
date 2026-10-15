@@ -61,21 +61,23 @@ def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
         return None
 
 
-def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, bool, bool]:
+def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, str]:
     source = source_dir / f"{type_name}.cs"
     case = cases / type_name
     case.mkdir()
     write_csharp_runner(case, source, type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
+    if csharp is None:
+        return type_name, "source_failed"
     emission = run([
         sys.executable, str(EMITTER), "--db", str(db),
         "--type", type_name, "--method", "TestEntryPoint", "--static-function",
     ], ROOT)
     if emission.returncode or not emission.stdout.strip():
-        return type_name, False, False
+        return type_name, "withheld"
     write_rust_runner(case, emission.stdout)
     rust = output_value(run(["cargo", "run", "--quiet"], case))
-    return type_name, True, csharp is not None and rust == csharp
+    return type_name, "agreed" if rust == csharp else "disagreed"
 
 
 def main() -> int:
@@ -119,16 +121,16 @@ def main() -> int:
         results = list(pool.map(
             lambda name: run_case(name, source_dir, db, cases), types))
     results.sort()
-    emitted = sum(emitted for _name, emitted, _agreed in results)
-    agreed = sum(emitted and matches for _name, emitted, matches in results)
-    disagreed = sum(emitted and not matches for _name, emitted, matches in results)
+    counts = {status: sum(1 for _name, found in results if found == status)
+              for status in ("agreed", "disagreed", "withheld", "source_failed")}
     print(json.dumps({
-        "cases": len(types), "emitted": emitted, "agreed": agreed,
-        "disagreed": disagreed,
+        "cases": len(types),
+        "emitted": counts["agreed"] + counts["disagreed"],
+        **counts,
     }, sort_keys=True))
     if not args.keep:
         shutil.rmtree(cases, ignore_errors=True)
-    return 1 if disagreed else 0
+    return 1 if counts["disagreed"] else 0
 
 
 if __name__ == "__main__":
