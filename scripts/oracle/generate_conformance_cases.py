@@ -40,7 +40,8 @@ public static class {name}
 """
 
 
-def caught_throwing_program(name: str, exception_type: str) -> str:
+def caught_throwing_program(
+        name: str, thrown_exception_type: str, caught_exception_type: str) -> str:
     return f"""using Xunit;
 
 public static class {name}
@@ -50,9 +51,9 @@ public static class {name}
     {{
         try
         {{
-            throw new {exception_type}("conformance");
+            throw new {thrown_exception_type}("conformance");
         }}
-        catch ({exception_type})
+        catch ({caught_exception_type})
         {{
             return 100;
         }}
@@ -79,7 +80,11 @@ def main() -> int:
             throwing_program(f"Throw_{index}", exception_type))
     for index, exception_type in enumerate(catalog["caught_exception_types"]):
         (OUT / f"Catch_{index}.cs").write_text(
-            caught_throwing_program(f"Catch_{index}", exception_type))
+            caught_throwing_program(f"Catch_{index}", exception_type, exception_type))
+    for index, case in enumerate(catalog["base_catch_exception_types"]):
+        (OUT / f"CatchBase_{index}.cs").write_text(
+            caught_throwing_program(
+                f"CatchBase_{index}", case["thrown"], case["caught"]))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 

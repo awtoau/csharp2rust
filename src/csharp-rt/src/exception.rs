@@ -40,7 +40,11 @@ pub fn catch<T>(body: impl FnOnce() -> T + UnwindSafe) -> Result<T, CsException>
 }
 
 pub fn is_type(exception: &CsException, type_name: &str) -> bool {
-    exception.type_name == type_name
+    // Every payload created by this module represents a managed exception, so
+    // C# `catch (System.Exception)` matches it regardless of its concrete
+    // type. More-specific custom base chains are emitted from corpus type facts
+    // before their catch shapes are enabled.
+    type_name == "System.Exception" || exception.type_name == type_name
 }
 
 pub fn rethrow(exception: CsException) -> ! {
@@ -68,6 +72,15 @@ mod tests {
     #[test]
     fn normal_return_does_not_become_an_exception() {
         assert_eq!(catch(|| 42), Ok(42));
+    }
+
+    #[test]
+    fn every_managed_exception_matches_system_exception() {
+        let exception = CsException::new(
+            "System.ArgumentException",
+            "value is invalid",
+        );
+        assert!(is_type(&exception, "System.Exception"));
     }
 
     #[test]
