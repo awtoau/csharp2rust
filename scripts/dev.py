@@ -181,6 +181,11 @@ def cmd_conformance(extra: list[str]) -> int:
     return run([sys.executable, "scripts/oracle/conformance.py", *extra])
 
 
+@command("discover dotnet runtime conformance candidates", kind="oracle")
+def cmd_discover_conformance(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/oracle/discover_conformance.py", *extra])
+
+
 @command("pin a Renode release and ingest a verified scratch corpus (issue #80)",
          kind="action")
 def cmd_sync_renode(extra: list[str]) -> int:
