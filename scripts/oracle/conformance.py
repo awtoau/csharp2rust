@@ -62,23 +62,23 @@ def output_value(result: subprocess.CompletedProcess[str]) -> int | None:
         return None
 
 
-def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, str]:
+def run_case(type_name: str, source_dir: Path, db: Path, cases: Path) -> tuple[str, str, str]:
     source = source_dir / f"{type_name}.cs"
     case = cases / type_name
     case.mkdir()
     write_csharp_runner(case, source, type_name)
     csharp = output_value(run(["dotnet", "run", "--project", "Case.csproj"], case))
     if csharp is None:
-        return type_name, "source_failed"
+        return type_name, "source_failed", "C# entry point did not produce an integer"
     emission = run([
         sys.executable, str(EMITTER), "--db", str(db),
         "--type", type_name, "--method", "TestEntryPoint", "--static-function",
     ], ROOT)
     if emission.returncode or not emission.stdout.strip():
-        return type_name, "withheld"
+        return type_name, "withheld", emission.stderr.strip() or "no emitted Rust"
     write_rust_runner(case, emission.stdout)
     rust = output_value(run(["cargo", "run", "--quiet"], case))
-    return type_name, "agreed" if rust == csharp else "disagreed"
+    return type_name, "agreed" if rust == csharp else "disagreed", ""
 
 
 def main() -> int:
@@ -122,12 +122,13 @@ def main() -> int:
         results = list(pool.map(
             lambda name: run_case(name, source_dir, db, cases), types))
     results.sort()
-    counts = {status: sum(1 for _name, found in results if found == status)
+    counts = {status: sum(1 for _name, found, _reason in results if found == status)
               for status in ("agreed", "disagreed", "withheld", "source_failed")}
     print(json.dumps({
         "cases": len(types),
         "emitted": counts["agreed"] + counts["disagreed"],
         **counts,
+        "reasons": {name: reason for name, status, reason in results if reason},
     }, sort_keys=True))
     if not args.keep:
         shutil.rmtree(cases, ignore_errors=True)

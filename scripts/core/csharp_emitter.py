@@ -1656,6 +1656,8 @@ def main() -> int:
         lines = em.emit_peripheral_method(args.type, args.method, static=True)
         con.close()
         sys.stdout.write("\n".join(lines) + ("\n" if lines else ""))
+        for gap in em.gaps:
+            print(f"withheld: {gap}", file=sys.stderr)
         return 0
     lines = em.emit_method(args.type, args.method)
     con.close()
