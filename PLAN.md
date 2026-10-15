@@ -448,16 +448,20 @@ This is the one place the plan knowingly departs from "faithful", and it is
 recorded as such. It should be **re-validated against the performance profile**
 rather than assumed.
 
-### Recoverable errors become return values *(was D4)*
+### Exceptions use a managed runtime unwind *(replaces D4)*
 
-What C# expects you to catch becomes a value the caller must check. What C#
-treats as a crash stays a crash.
+The faithful conversion stage preserves C# exception semantics. `throw`,
+`try`, `catch`, rethrow, and cleanup run through a typed exception payload in
+`csharp-rt`; a translated `catch` matches its C# exception type and resumes
+unwinding when it does not match. This keeps C# callback and delegate
+signatures unchanged and does not turn catchable failures into Rust return
+values.
 
-Renode's `RecoverableException` / `ConstructionException` become
-`Result<T, RenodeError>` threaded with `?`. What C# treats as fatal
-(`NullReferenceException` and friends) becomes a panic. Note that the
-`STM32_CRC` defect above *is* a fatal C# exception that aborts the emulator
-process — in Rust that construct does not compile, which is the point.
+`Result`, ownership-driven error paths, and other Rust-native rewrites belong
+only to a later optimisation stage, after the differential oracle proves the
+deviation. The runtime must reject `panic = "abort"` for translated exception
+paths, because abort would silently make every C# `catch` unreachable. See
+`docs/research/exceptions.md` for the measured reach and runtime design.
 
 ## The remaining C#→Rust mappings
 

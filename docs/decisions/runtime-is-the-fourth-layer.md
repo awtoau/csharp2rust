@@ -31,8 +31,8 @@ once as ordinary Rust, tested once, and called.
 - **`OrderBy` maps to `{recv}`** — the receiver, unchanged. A sort that does not
   sort. It compiles, and it replays any trace that does not depend on ordering.
 - **`First` maps to `{recv}.iter().next().unwrap()`.** C# throws
-  `InvalidOperationException`; Rust panics. Under D4 those are not the same
-  thing, and the difference is invisible in the template.
+  `InvalidOperationException`; an untyped Rust panic cannot participate in a
+  translated C# `catch`, and the difference is invisible in the template.
 - **`Array2D<T>` is already this**, and nobody called it a layer. Rust has no
   rectangular array; `csharp-rt` has one, with tests. That worked.
 
