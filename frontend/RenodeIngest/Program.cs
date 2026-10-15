@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.MSBuild;
 
 namespace RenodeIngest;
@@ -65,6 +66,7 @@ public static class Program
         // a smoke test is a real way to lose a corpus, and costs nothing to
         // refuse.
         var all = args.Contains("--all");
+        var sourceDir = ArgValue(args, "--source-dir");
 
         // Reflection audit of Roslyn's own API surface. Needs no corpus and no
         // Renode tree, so it runs before any path handling.
@@ -74,11 +76,77 @@ public static class Program
             return 0;
         }
 
+        if (!string.IsNullOrWhiteSpace(sourceDir))
+        {
+            return await RunStandaloneSources(
+                Path.GetFullPath(sourceDir), dbPath, threads, dryRun,
+                ArgValue(args, "--source-name") ?? "dotnet-runtime",
+                ArgValue(args, "--source-revision"));
+        }
+
         var renodeSrc = Environment.GetEnvironmentVariable("RENODE_SRC");
         if (string.IsNullOrWhiteSpace(renodeSrc))
         {
             Console.Error.WriteLine("RENODE_SRC not set (see .env.example)");
             return 1;
+        }
+
+        async Task<int> RunStandaloneSources(
+            string sourceDir, string dbPath, int threads, bool dryRun,
+            string sourceName, string? sourceRevision)
+        {
+            if (!Directory.Exists(sourceDir))
+            {
+                Console.Error.WriteLine($"source directory not found: {sourceDir}");
+                return 1;
+            }
+
+            var paths = Directory.EnumerateFiles(sourceDir, "*.cs",
+                    SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList();
+            if (paths.Count == 0)
+            {
+                Console.Error.WriteLine($"no .cs files found under {sourceDir}");
+                return 1;
+            }
+
+            var trees = paths.Select(path => CSharpSyntaxTree.ParseText(
+                File.ReadAllText(path), path: path)).ToList();
+            var factStub = CSharpSyntaxTree.ParseText("""
+                namespace Xunit
+                {
+                    [System.AttributeUsage(System.AttributeTargets.Method)]
+                    public sealed class FactAttribute : System.Attribute {}
+                }
+                """, path: "<conformance-stubs>");
+            var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            if (string.IsNullOrEmpty(tpa))
+            {
+                Console.Error.WriteLine("runtime did not provide trusted platform assemblies");
+                return 1;
+            }
+            var references = tpa.Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path));
+            var compilation = CSharpCompilation.Create(
+                "conformance-corpus", trees.Append(factStub), references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var errors = compilation.GetDiagnostics()
+                .Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+            if (errors.Count > 0)
+            {
+                Console.Error.WriteLine(
+                    $"standalone compilation has {errors.Count} error(s); refusing ingest");
+                foreach (var error in errors.Take(20)) Console.Error.WriteLine($"  {error}");
+                return 1;
+            }
+
+            Console.WriteLine($"standalone {paths.Count} source file(s), source `{sourceName}`");
+            if (dryRun) return 0;
+            var written = await Ingest.RunAsync(
+                compilation, trees, dbPath, sourceDir, sourceName,
+                sourceRevision ?? GitCommit(sourceDir), threads, "conformance");
+            return written ? 0 : 1;
         }
 
         if (all && Path.GetFullPath(dbPath).EndsWith(
