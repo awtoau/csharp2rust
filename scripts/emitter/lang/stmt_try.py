@@ -34,6 +34,28 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
     if len(children) < 2 or children[0][1] != "Block":
         return None
     body_id = children[0][0]
+    pad = "    " * indent
+    if len(children) == 2 and children[1][1] == "Block":
+        finally_id = children[1][0]
+        if has_return(em, body_id) or has_return(em, finally_id):
+            return None
+        body = em.emit_block(body_id, indent + 1)
+        final_after = em.emit_block(finally_id, indent)
+        final_before_rethrow = em.emit_block(finally_id, indent + 2)
+        return [
+            f"{pad}// C# try/finally: managed unwind runs cleanup before propagation.",
+            f"{pad}let managed_exception = csharp_rt::catch(|| {{",
+            *body,
+            f"{pad}}});",
+            f"{pad}match managed_exception {{",
+            f"{pad}    Ok(()) => {{}},",
+            f"{pad}    Err(exception) => {{",
+            *final_before_rethrow,
+            f"{pad}        csharp_rt::rethrow(exception);",
+            f"{pad}    }},",
+            f"{pad}}};",
+            *final_after,
+        ]
     catch_nodes = list(children[1:])
     finally_id = None
     if catch_nodes[-1][1] == "Block":
@@ -62,7 +84,6 @@ def try_stmt(em, oid: int, indent: int) -> list[str] | None:
             any(has_return(em, catch_body_id) for _, catch_body_id in catches)
             or has_return(em, finally_id)):
         return None
-    pad = "    " * indent
     body = em.emit_block(body_id, indent + 1)
     handlers: list[tuple[str, list[str]]] = []
     for exception_type, catch_body_id in catches:

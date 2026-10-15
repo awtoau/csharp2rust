@@ -47,5 +47,8 @@
       "first_catch": "System.InvalidOperationException",
       "second_catch": "System.ArgumentException"
     }
+  ],
+  "finally_without_catch_exception_types": [
+    "System.ArgumentException"
   ]
 }

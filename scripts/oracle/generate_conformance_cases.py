@@ -244,6 +244,36 @@ public static class {name}
 """
 
 
+def finally_without_catch_program(name: str, exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        var value = 0;
+        try
+        {{
+            try
+            {{
+                throw new {exception_type}("conformance");
+            }}
+            finally
+            {{
+                value = 100;
+            }}
+        }}
+        catch ({exception_type})
+        {{
+            return value;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -304,6 +334,10 @@ def main() -> int:
                 case["first_catch"],
                 case["second_catch"],
             ))
+    for index, exception_type in enumerate(catalog["finally_without_catch_exception_types"]):
+        (OUT / f"FinallyWithoutCatch_{index}.cs").write_text(
+            finally_without_catch_program(
+                f"FinallyWithoutCatch_{index}", exception_type))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 
