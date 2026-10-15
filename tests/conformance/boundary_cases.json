@@ -53,5 +53,6 @@
   ],
   "catch_variable_exception_types": [
     "System.ArgumentException"
-  ]
+  ],
+  "custom_exception_inheritance_cases": 1
 }

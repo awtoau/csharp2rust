@@ -296,6 +296,38 @@ public static class {name}
 """
 
 
+def custom_exception_inheritance_program(name: str) -> str:
+    return f"""using Xunit;
+
+public class {name}BaseException : System.Exception
+{{
+    public {name}BaseException(string message) : base(message) {{ }}
+}}
+
+public class {name}DerivedException : {name}BaseException
+{{
+    public {name}DerivedException(string message) : base(message) {{ }}
+}}
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        try
+        {{
+            throw new {name}DerivedException("conformance");
+        }}
+        catch ({name}BaseException)
+        {{
+            return 100;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -363,6 +395,10 @@ def main() -> int:
     for index, exception_type in enumerate(catalog["catch_variable_exception_types"]):
         (OUT / f"CatchVariable_{index}.cs").write_text(
             catch_variable_program(f"CatchVariable_{index}", exception_type))
+    for index in range(catalog["custom_exception_inheritance_cases"]):
+        (OUT / f"CustomExceptionInheritance_{index}.cs").write_text(
+            custom_exception_inheritance_program(
+                f"CustomExceptionInheritance_{index}"))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 
