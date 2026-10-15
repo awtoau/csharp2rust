@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T21:24:59+11:00 from `4a2705c` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-16T08:35:35+11:00 from `9de7d9d` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -56,18 +56,18 @@ averaged 1.87 validation instances each.
 | `rulesdb/rules/constructor.json` | 8,226 bytes |
 | `rulesdb/rules/object_graph.json` | 7,310 bytes |
 
-**What the converter cannot yet emit** (29,306 gaps over 621 types, 621 emitted, 0 converter crash(es) — not a correctness claim, see [docs/rule-engine-readiness.md](docs/rule-engine-readiness.md); regenerate with `python3 scripts/analysis/gap_census.py`):
+**What the converter cannot yet emit** (29,307 gaps over 621 types, 621 emitted, 0 converter crash(es) — not a correctness claim, see [docs/rule-engine-readiness.md](docs/rule-engine-readiness.md); regenerate with `python3 scripts/analysis/gap_census.py`):
 
 | gap category | count | share |
 |---|---:|---:|
-| missing state (cascade) | 5,106 | 17.4% |
-| constructor: statement not an initialiser | 3,805 | 13.0% |
+| missing state (cascade) | 5,107 | 17.4% |
+| constructor: statement not an initialiser | 3,806 | 13.0% |
 | other | 3,690 | 12.6% |
 | unhandled expression kind | 2,195 | 7.5% |
 | unmapped return type | 1,931 | 6.6% |
 | missing peer method (cascade) | 1,893 | 6.5% |
 | unmapped parameter type | 1,751 | 6.0% |
-| withheld dependency (cascade) | 1,444 | 4.9% |
+| withheld dependency (cascade) | 1,443 | 4.9% |
 | object graph: target not emitted | 1,083 | 3.7% |
 | exceptions | 793 | 2.7% |
 | callback with no rule | 741 | 2.5% |
