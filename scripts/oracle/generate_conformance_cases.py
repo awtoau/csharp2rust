@@ -331,6 +331,8 @@ public static class {name}
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
+    for generated in OUT.glob("*.cs"):
+        generated.unlink()
     cases: list[tuple[str, str]] = []
     for index, value in enumerate(catalog["integer_literals"]):
         cases.append((f"Integer_{index}", f"({value}) == ({value})"))
