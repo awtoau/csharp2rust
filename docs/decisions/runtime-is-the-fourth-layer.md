@@ -52,6 +52,24 @@ call site.** Three tells, any one sufficient:
 Everything else stays a rule. `ConditionalOr` → `||` is a rename and must not
 move.
 
+## Crate-first, not hand-rolled
+
+Before adding a runtime representation, assess the Rust standard library and
+maintained crates. Reuse one when it can preserve the observed C# contract;
+write only the adapter that makes its behavior available to generated code.
+Record a rejected candidate with the semantic it cannot preserve. A familiar
+Rust facility is not automatically a C# equivalent: `TypeId` is not
+`System.Type`, and an untyped `panic!` is not a catchable C# exception.
+
+Current candidates are deliberately narrow:
+
+* typed exception unwind uses Rust's standard `panic_any`, `catch_unwind`, and
+  payload downcast facilities behind `csharp-rt`;
+* `gc-arena` is assessed before extending managed-object support beyond the
+  existing runtime;
+* `bevy_reflect` is assessed only for a named observed reflection operation,
+  never claimed as a wholesale `System.Reflection` replacement.
+
 ## What this does not change
 
 - **Rules are still the source code and the Rust is still a build artifact.**
