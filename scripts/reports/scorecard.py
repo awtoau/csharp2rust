@@ -9,7 +9,7 @@ detect drift, and reports absence as absence rather than omitting a row.
 Every figure is derived from committed evidence or live tooling; nothing is
 hand-maintained. A row reading "not started" is a real answer.
 
-Run:  python3 scripts/scorecard.py [--check]
+Run:  python3 scripts/reports/scorecard.py [--check]
       --check exits 1 if STATUS.md is stale (for CI)
 Log:  ./tmp/logs/scorecard.log
 """
@@ -43,6 +43,10 @@ RULE_FILES = ["csharp_core.json", "register_dsl.json", "bug_rules.json",
 
 # The health metric that detects rule-pipeline drift. See docs/rulesdb-design.md.
 MIN_INSTANCES_PER_RULE = 3.0
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
+from repo_slug import repo_slug  # noqa: E402
 
 
 def repo_root() -> Path:
@@ -224,6 +228,7 @@ def build(root: Path) -> str:
     commit = sh("git", "-C", str(root), "rev-parse", "--short", "HEAD") or "unknown"
 
     issues = issue_stats(root)
+    slug = repo_slug()
     rules = rules_stats(root)
     base = baseline_stats(root)
     floor = load_json(root, FLOOR)
@@ -235,7 +240,7 @@ def build(root: Path) -> str:
     a = L.append
     a("# renode-rs — scorecard")
     a("")
-    a(f"Generated {now} from `{commit}` by `scripts/scorecard.py`. **Do not edit by hand.**")
+    a(f"Generated {now} from `{commit}` by `scripts/reports/scorecard.py`. **Do not edit by hand.**")
     a("")
     a("Leading with the metrics that detect drift, not the ones that flatter it —")
     a('"files translated" is exactly what looked healthy in `linux-rs` while its rules')
@@ -508,12 +513,24 @@ def build(root: Path) -> str:
     a("current ones did, and one contained a `.with_reserved(9, 23)` call the C#")
     a("does not have.")
     a("")
-    gen_ok = (root / "scripts" / "check_generated.py").exists()
+    gen_ok = (root / "scripts" / "core" / "check_generated.py").exists()
+    hook = root / "scripts" / "githooks" / "pre-commit"
+    wired = gen_ok and hook.exists() and "check_generated.py" in hook.read_text(encoding="utf-8")
+    hooks_path = sh("git", "config", "core.hooksPath")
+    installed = wired and (hooks_path or "").strip() == "scripts/githooks"
     a("| | |")
     a("|---|---|")
     a("| files produced by the converter | 1 (`uart_registers.rs`) |")
     a("| peripherals still hand-written | uart behaviour, gpio layout + behaviour |")
-    a(f"| enforcement | {'`check_generated.py`, pre-commit' if gen_ok else 'none'} |")
+    if installed:
+        enforcement = "`check_generated.py`, pre-commit (hook installed)"
+    elif wired:
+        enforcement = ("`check_generated.py` is in the pre-commit hook, "
+                       "but the hook is NOT installed here "
+                       "(`python3 scripts/dev.py install-hooks`)")
+    else:
+        enforcement = "none"
+    a(f"| enforcement | {enforcement} |")
     a("")
     a("The UART's register layout is now generated and enforced byte-for-byte.")
     a("Deleting the hand-written version removed three edits that had survived")
@@ -623,8 +640,7 @@ def build(root: Path) -> str:
     if issues:
         a(f"{issues['open']} open, {issues['closed']} closed, {issues['total']} total. "
           "Full list: "
-          "[github.com/awtoau/awto-renode-rs/issues]"
-          "(https://github.com/awtoau/awto-renode-rs/issues).")
+          f"[github.com/{slug}/issues](https://github.com/{slug}/issues).")
         a("")
         a("| phase | open | closed |")
         a("|---|---:|---:|")
@@ -641,7 +657,7 @@ def build(root: Path) -> str:
             for label in sorted(issues["by_label"]):
                 nums = issues["by_label"][label]
                 a(f"| `{label}` | {len(nums)} — "
-                  + ", ".join(f"[#{n}](https://github.com/awtoau/awto-renode-rs/issues/{n})"
+                  + ", ".join(f"[#{n}](https://github.com/{slug}/issues/{n})"
                               for n in nums[:12])
                   + (f", +{len(nums)-12} more" if len(nums) > 12 else "")
                   + " |")
@@ -650,7 +666,7 @@ def build(root: Path) -> str:
             a("**Gate-labeled**:")
             a("")
             for num, title, state in issues["gates"]:
-                a(f"- [#{num}](https://github.com/awtoau/awto-renode-rs/issues/{num}) "
+                a(f"- [#{num}](https://github.com/{slug}/issues/{num}) "
                   f"({state}): {title}")
             a("")
     else:
@@ -685,7 +701,7 @@ def main() -> int:
 
     if args.check:
         if body(fresh) != body(current):
-            log.error("%s is stale -- run scripts/scorecard.py", OUT)
+            log.error("%s is stale -- run scripts/reports/scorecard.py", OUT)
             return 1
         log.info("%s is current", OUT)
         return 0

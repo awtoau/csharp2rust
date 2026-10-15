@@ -32,7 +32,7 @@ Two rules follow from that, and they are hard errors, not preferences.
 
 ### No absolute paths in tracked files
 
-Enforced by `python3 scripts/check_paths.py` (exit 1 on violation, log to
+Enforced by `python3 scripts/validation/check_paths.py` (exit 1 on violation, log to
 `tmp/logs/check_paths.log`). Run it before every commit.
 
 - **Docs** — reference repos by name (`awtoau/c2rust`) and files by
@@ -52,9 +52,9 @@ scripts use git, not the editor.
 
 ### No second source of truth
 
-Enforced by `python3 scripts/check_derived.py` (pre-commit, hard failure).
+Enforced by `python3 scripts/validation/check_derived.py` (pre-commit, hard failure).
 
-Platform configuration lives in the `.repl`. `scripts/parse_repl.py` derives
+Platform configuration lives in the `.repl`. `scripts/core/parse_repl.py` derives
 `docs/status/platform.json` and the generated `src/renode-stm32/src/platform.rs`
 from it; everything else **reads** those. Retyping a reset value or a peripheral
 list into a test creates a copy that drifts silently — change the platform and
@@ -140,10 +140,12 @@ scripts alone". Saying it was not enough, so it is now checked.
 
 ### Enforced
 
-- `scripts/check_generated.py` (pre-commit, hard failure): a file listed as
+- Hooks only run after `python3 scripts/dev.py install-hooks` (sets
+  `core.hooksPath`); a fresh clone has none. STATUS.md reports whether installed.
+- `scripts/core/check_generated.py` (pre-commit, hard failure): a file listed as
   generated must be byte-identical to converter output. Hand-editing one fails
   the commit.
-- `scripts/verify_emit.py`: diffs a hand-written peripheral against what the
+- `scripts/oracle/verify_emit.py`: diffs a hand-written peripheral against what the
   converter produces, and names every difference as either an emitter gap or a
   hand edit that should not exist.
 - Anything not yet reproducible is recorded as a **patch** and counted on the
@@ -194,7 +196,7 @@ could not emit those constructs; it was simply never asked. Do not "fix" a gap
 count by emitting something plausible.
 
 **`--all` declares a run's PURPOSE, not its scope** — every run reads every
-file. It marks a tooling health check (`scripts/check_breadth.py`) whose output
+file. It marks a tooling health check (`scripts/validation/check_breadth.py`) whose output
 goes to a scratch database tagged `config = 'breadth'` and is refused by every
 rule/cluster consumer. That check earns its place: it found 5,123 methods
 (24.7%) claiming a body while emitting no operations, with zero exceptions
