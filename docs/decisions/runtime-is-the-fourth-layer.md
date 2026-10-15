@@ -31,8 +31,8 @@ once as ordinary Rust, tested once, and called.
 - **`OrderBy` maps to `{recv}`** — the receiver, unchanged. A sort that does not
   sort. It compiles, and it replays any trace that does not depend on ordering.
 - **`First` maps to `{recv}.iter().next().unwrap()`.** C# throws
-  `InvalidOperationException`; Rust panics. Under D4 those are not the same
-  thing, and the difference is invisible in the template.
+  `InvalidOperationException`; an untyped Rust panic cannot participate in a
+  translated C# `catch`, and the difference is invisible in the template.
 - **`Array2D<T>` is already this**, and nobody called it a layer. Rust has no
   rectangular array; `csharp-rt` has one, with tests. That worked.
 
@@ -51,6 +51,24 @@ call site.** Three tells, any one sufficient:
 
 Everything else stays a rule. `ConditionalOr` → `||` is a rename and must not
 move.
+
+## Crate-first, not hand-rolled
+
+Before adding a runtime representation, assess the Rust standard library and
+maintained crates. Reuse one when it can preserve the observed C# contract;
+write only the adapter that makes its behavior available to generated code.
+Record a rejected candidate with the semantic it cannot preserve. A familiar
+Rust facility is not automatically a C# equivalent: `TypeId` is not
+`System.Type`, and an untyped `panic!` is not a catchable C# exception.
+
+Current candidates are deliberately narrow:
+
+* typed exception unwind uses Rust's standard `panic_any`, `catch_unwind`, and
+  payload downcast facilities behind `csharp-rt`;
+* `gc-arena` is assessed before extending managed-object support beyond the
+  existing runtime;
+* `bevy_reflect` is assessed only for a named observed reflection operation,
+  never claimed as a wholesale `System.Reflection` replacement.
 
 ## What this does not change
 

@@ -84,8 +84,9 @@ def fixture(schema: str, *, config: str, oracle_tier: int,
     if old_trigger:
         con.execute("DROP TRIGGER IF EXISTS rule_commit_threshold")
         con.executescript(OLD_TRIGGER)
-    con.execute("INSERT INTO corpus_run(id,started_at,renode_commit,tool_version,"
-                "config) VALUES (1,'2026-08-02T00:00:00+10:00','x','x',?)",
+    con.execute("INSERT INTO corpus_run(id,started_at,source_name,source_revision,"
+                "tool_version,config) VALUES (1,'2026-08-02T00:00:00+10:00',"
+                "'fixture','x','x',?)",
                 (config,))
     con.execute("INSERT INTO file(id,run_id,path,sha256,loc) "
                 "VALUES (1,1,'A.cs','x',1)")

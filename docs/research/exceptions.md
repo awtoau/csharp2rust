@@ -3,7 +3,7 @@
 Research for issue #39. Nothing here is implemented; this document exists to
 settle *which* mechanism the emitter should build before anyone builds it.
 
-**It reopens declared deviation D4.** PLAN.md states:
+**It replaces declared deviation D4.** PLAN.md formerly stated:
 
 > ### D4 — Exceptions → `Result`, panics for the fatal
 >
@@ -12,8 +12,9 @@ settle *which* mechanism the emitter should build before anyone builds it.
 
 That was decided before the register DSL's callback types were committed. The
 two are not compatible, and section 5 shows the exact call chain in the corpus
-where the `?` chain has nowhere to go. Per CLAUDE.md a deviation is reopened,
-never silently revisited — this is the reopening.
+where the `?` chain has nowhere to go. The faithful conversion stage now adopts
+the typed-unwinding design below; Rust-idiom rewrites remain a separate,
+oracle-validated optimisation stage.
 
 ---
 
@@ -24,7 +25,7 @@ Translate `throw` to a **typed unwinding panic** (`panic_any` with a
 `downcast` + `resume_unwind` for anything not matched. Do **not** thread
 `Result` through translated method signatures. `finally` and `using` become
 scope guards, which Rust's `Drop` implements faithfully for every corpus shape
-present. This is the only option that leaves the DSL's
+present. This is the adopted fidelity-stage mechanism because it leaves the DSL's
 `ValueProvider`/`WriteCallback` signatures untouched, because it does not
 colour signatures at all. Its failure mode is `panic = "abort"`: a profile
 setting three lines long silently converts every translated `catch` into a
