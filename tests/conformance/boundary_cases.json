@@ -24,5 +24,12 @@
   ],
   "rethrow_exception_types": [
     "System.ArgumentException"
+  ],
+  "unmatched_finally_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "inner_caught": "System.InvalidOperationException",
+      "outer_caught": "System.ArgumentException"
+    }
   ]
 }

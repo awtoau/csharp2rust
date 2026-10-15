@@ -1,6 +1,6 @@
 //! Managed exception payloads for translated C# `throw` and `catch`.
 
-use std::panic::{catch_unwind, panic_any, resume_unwind, UnwindSafe};
+use std::panic::{catch_unwind, panic_any, resume_unwind, AssertUnwindSafe};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CsException {
@@ -29,8 +29,8 @@ pub fn throw(exception: CsException) -> ! {
     panic_any(exception);
 }
 
-pub fn catch<T>(body: impl FnOnce() -> T + UnwindSafe) -> Result<T, CsException> {
-    match catch_unwind(body) {
+pub fn catch<T>(body: impl FnOnce() -> T) -> Result<T, CsException> {
+    match catch_unwind(AssertUnwindSafe(body)) {
         Ok(value) => Ok(value),
         Err(payload) => match payload.downcast::<CsException>() {
             Ok(exception) => Err(*exception),
@@ -72,6 +72,21 @@ mod tests {
     #[test]
     fn normal_return_does_not_become_an_exception() {
         assert_eq!(catch(|| 42), Ok(42));
+    }
+
+    #[test]
+    fn catches_managed_exception_after_mutating_csharp_local() {
+        let mut value = 0;
+        let result = catch(|| {
+            value = 100;
+            throw(CsException::new(
+                "System.ArgumentException",
+                "value is invalid",
+            ));
+        });
+
+        assert!(result.is_err());
+        assert_eq!(value, 100);
     }
 
     #[test]
