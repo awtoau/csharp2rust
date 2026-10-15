@@ -9,6 +9,9 @@ tmp/
 # directory it cannot read.
 .claude/
 
+# Editor-local config (machine-specific MCP servers etc.)
+.vscode/
+
 # Rust
 target/
 Cargo.lock
