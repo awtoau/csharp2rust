@@ -50,5 +50,8 @@
   ],
   "finally_without_catch_exception_types": [
     "System.ArgumentException"
+  ],
+  "catch_variable_exception_types": [
+    "System.ArgumentException"
   ]
 }

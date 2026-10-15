@@ -274,6 +274,28 @@ public static class {name}
 """
 
 
+def catch_variable_program(name: str, exception_type: str) -> str:
+    return f"""using Xunit;
+
+public static class {name}
+{{
+    [Fact]
+    public static int TestEntryPoint()
+    {{
+        try
+        {{
+            throw new {exception_type}("conformance");
+        }}
+        catch ({exception_type} exception)
+        {{
+            return exception.Message == "conformance" ? 100 : 101;
+        }}
+        return 101;
+    }}
+}}
+"""
+
+
 def main() -> int:
     catalog = json.loads(CATALOG.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -338,6 +360,9 @@ def main() -> int:
         (OUT / f"FinallyWithoutCatch_{index}.cs").write_text(
             finally_without_catch_program(
                 f"FinallyWithoutCatch_{index}", exception_type))
+    for index, exception_type in enumerate(catalog["catch_variable_exception_types"]):
+        (OUT / f"CatchVariable_{index}.cs").write_text(
+            catch_variable_program(f"CatchVariable_{index}", exception_type))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 
