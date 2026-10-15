@@ -11,6 +11,8 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -18,6 +20,26 @@ ROOT = Path(__file__).resolve().parents[2]
 GENERATE = ROOT / "scripts" / "oracle" / "generate_conformance_cases.py"
 INGEST_PROJECT = ROOT / "frontend" / "RenodeIngest"
 EMITTER = ROOT / "scripts" / "core" / "csharp_emitter.py"
+RESULT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS conformance_run (
+    id INTEGER PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    source_revision TEXT NOT NULL,
+    converter_revision TEXT NOT NULL,
+    jobs INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS conformance_result (
+    run_id INTEGER NOT NULL REFERENCES conformance_run(id),
+    case_path TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    PRIMARY KEY (run_id, case_path)
+);
+CREATE INDEX IF NOT EXISTS conformance_result_case
+    ON conformance_result(case_path, status);
+"""
 
 
 def run(argv: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -91,6 +113,44 @@ def failure_reason(result: subprocess.CompletedProcess[str]) -> str:
     return output[-1] if output else f"exit status {result.returncode}"
 
 
+def converter_revision() -> str:
+    result = run(["git", "rev-parse", "HEAD"], ROOT)
+    if result.returncode:
+        raise RuntimeError(f"cannot determine converter revision: {failure_reason(result)}")
+    return result.stdout.strip()
+
+
+def create_result_run(db: Path, source_name: str, source_revision: str,
+                      jobs: int) -> tuple[sqlite3.Connection, int]:
+    db.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(db)
+    con.executescript(RESULT_SCHEMA)
+    cursor = con.execute(
+        """INSERT INTO conformance_run(
+               started_at, source_name, source_revision, converter_revision, jobs)
+           VALUES (?, ?, ?, ?, ?)""",
+        (datetime.now(timezone.utc).isoformat(), source_name, source_revision,
+         converter_revision(), jobs))
+    con.commit()
+    return con, cursor.lastrowid
+
+
+def record_results(con: sqlite3.Connection, run_id: int,
+                   results: list[tuple[str, str, str, int]]) -> None:
+    con.executemany(
+        """INSERT INTO conformance_result(
+               run_id, case_path, status, reason, duration_ms)
+           VALUES (?, ?, ?, ?, ?)""",
+        [(run_id, *result) for result in results])
+    con.commit()
+
+
+def timed_case(work) -> tuple[str, str, str, int]:
+    started = time.monotonic()
+    name, status, reason = work()
+    return name, status, reason, round((time.monotonic() - started) * 1000)
+
+
 def run_runtime_candidate(candidate: dict[str, str], tests: Path,
                           cases: Path) -> tuple[str, str, str]:
     relative_source = candidate["path"]
@@ -142,6 +202,7 @@ def main() -> int:
     ap.add_argument("--source-dir", type=Path)
     ap.add_argument("--runtime-manifest", type=Path)
     ap.add_argument("--report", type=Path)
+    ap.add_argument("--results-db", type=Path)
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("-j", "--jobs", type=int, default=32)
     args = ap.parse_args()
@@ -162,47 +223,64 @@ def main() -> int:
                 ap.error("DOTNET_RUNTIME_SRC must be set for --runtime-manifest")
             manifest = json.loads(args.runtime_manifest.read_text())
             source_dir = Path(runtime) / "src" / "tests"
+    source_name = "conformance"
+    source_revision = "local"
+    if args.runtime_manifest:
+        source_name = manifest["source"]
+        source_revision = manifest["revision"]
 
     cases = work / "cases"
     shutil.rmtree(cases, ignore_errors=True)
     cases.mkdir()
     if args.jobs < 1:
         ap.error("--jobs must be positive")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        if args.runtime_manifest:
-            results = list(pool.map(
-                lambda candidate: run_runtime_candidate(candidate, source_dir, cases),
-                manifest["candidates"]))
-        else:
-            db = work / "corpus.db"
-            ingested = run([
-                "dotnet", "run", "--project", str(INGEST_PROJECT), "--",
-                "--source-dir", str(source_dir), "--source-name", "conformance",
-                "--source-revision", "local", "--db", str(db), "-j", "32",
-            ], ROOT)
-            if ingested.returncode:
-                print(ingested.stdout + ingested.stderr, file=sys.stderr)
-                return 1
-            con = sqlite3.connect(db)
-            types = [row for row in con.execute(
-                """SELECT t.name, f.path FROM type t JOIN member mb ON mb.type_id=t.id
-                   JOIN method m ON m.member_id=mb.id
-                   JOIN file f ON f.id=t.file_id
-                   WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
-                   ORDER BY f.path, t.name""")]
-            con.close()
-            results = list(pool.map(
-                lambda entry: run_case(entry, source_dir, db, cases), types))
-    results.sort()
+    results_db = args.results_db or work / "results.db"
+    result_con, result_run = create_result_run(
+        results_db, source_name, source_revision, args.jobs)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            if args.runtime_manifest:
+                results = list(pool.map(
+                    lambda candidate: timed_case(
+                        lambda: run_runtime_candidate(candidate, source_dir, cases)),
+                    manifest["candidates"]))
+            else:
+                db = work / "corpus.db"
+                ingested = run([
+                    "dotnet", "run", "--project", str(INGEST_PROJECT), "--",
+                    "--source-dir", str(source_dir), "--source-name", source_name,
+                    "--source-revision", source_revision, "--db", str(db), "-j", "32",
+                ], ROOT)
+                if ingested.returncode:
+                    print(ingested.stdout + ingested.stderr, file=sys.stderr)
+                    return 1
+                con = sqlite3.connect(db)
+                types = [row for row in con.execute(
+                    """SELECT t.name, f.path FROM type t JOIN member mb ON mb.type_id=t.id
+                       JOIN method m ON m.member_id=mb.id
+                       JOIN file f ON f.id=t.file_id
+                       WHERE mb.name='TestEntryPoint' AND mb.is_static=1 AND m.has_body=1
+                       ORDER BY f.path, t.name""")]
+                con.close()
+                results = list(pool.map(
+                    lambda entry: timed_case(
+                        lambda: run_case(entry, source_dir, db, cases)),
+                    types))
+        results.sort()
+        record_results(result_con, result_run, results)
+    finally:
+        result_con.close()
     statuses = ("agreed", "disagreed", "withheld", "source_failed",
                 "ingest_failed", "ambiguous_entry")
-    counts = {status: sum(1 for _name, found, _reason in results if found == status)
+    counts = {status: sum(1 for _name, found, _reason, _duration in results if found == status)
               for status in statuses}
     report = {
         "cases": len(results),
         "emitted": counts["agreed"] + counts["disagreed"],
         **counts,
-        "reasons": {name: reason for name, status, reason in results if reason},
+        "reasons": {
+            name: reason for name, status, reason, _duration in results if reason
+        },
     }
     rendered = json.dumps(report, sort_keys=True)
     if args.report:
