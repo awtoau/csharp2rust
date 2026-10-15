@@ -40,6 +40,7 @@ def expression_stmt(em, oid: int, indent: int) -> list[str]:
         return em.emit_stmt(kids[0][0], indent)
     prev_pos = getattr(em, "_stmt_position", False)
     em._stmt_position = True
+    em._stmt_oid = kids[0][0]
     try:
         return [pad + em.emit_expr(kids[0][0]) + ";"]
     finally:

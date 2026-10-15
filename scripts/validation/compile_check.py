@@ -392,7 +392,9 @@ def main() -> int:
         if d.get("level") != "error":
             continue
         total += 1
-        code = (d.get("code") or {}).get("code") or "no-code"
+        code = (d.get("code") or {}).get("code")
+        if not code:  # code-less errors: group by message text, not lumped
+            code = "no-code: " + (d.get("message") or "")[:60]
         codes[code] += 1
         examples.setdefault(code, (d.get("message") or "")[:88])
         for span in d.get("spans", []):
@@ -411,7 +413,7 @@ def main() -> int:
         log.info("%-14s %7s  %s", "rustc code", "count", "example")
         log.info("%s", "-" * 78)
         for code, n in codes.most_common(20):
-            log.info("%-14s %7d  %s", code, n, examples.get(code, "")[:56])
+            log.info("%-14s %7d  %s", code[:60], n, examples.get(code, "")[:56])
         log.info("%s", "-" * 78)
         log.info("%d error(s) across %d module(s)", total, len(per_mod))
         log.info("")

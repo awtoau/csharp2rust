@@ -37,10 +37,38 @@ from emitter import core
 from emitter.core import snake
 
 
+def drop_unused_trailing_args(rest: list[str]) -> list[str]:
+    """C# ignores format arguments the string never references; Rust rejects
+    them (`argument never used`). Drop trailing ones: they are only displayed,
+    never mutated. Only indexed (`{N}`) formats are inspected."""
+    if len(rest) < 2 or not rest[0].startswith('"'):
+        return rest
+    if "{" not in rest[0]:
+        return rest[:1]
+    used = {int(i) for i in re.findall(r"\{(\d+)[:}]", rest[0])}
+    if not used:
+        return rest
+    keep = len(rest) - 1
+    while keep > 0 and (keep - 1) not in used:
+        keep -= 1
+    return rest[:keep + 1]
+
+
 class Expressions:
     """Mixin: expression emission."""
 
     def emit_expr(self, oid: int) -> str:
+        """Emit one expression; `_stmt_position` holds only for the node that
+        IS the expression statement, never for operands nested inside it
+        (`x = <gap>;` is not a valid statement-position gap)."""
+        prev = getattr(self, "_stmt_position", False)
+        self._stmt_position = prev and getattr(self, "_stmt_oid", None) == oid
+        try:
+            return self._emit_expr(oid)
+        finally:
+            self._stmt_position = prev
+
+    def _emit_expr(self, oid: int) -> str:
         """Recursively emit one expression.
 
         Generic structure (operators, literals) comes from the LANGUAGE rules;
@@ -137,23 +165,26 @@ class Expressions:
             receiver=self.emit_expr(rid), name=name)
 
     def csharp_format(self, text: str) -> str:
-        """C# composite format to Rust. `{0:X}` -> `{:X}`, `{1:X8}` -> `{:08X}`.
+        """C# composite format to Rust. `{0:X}` -> `{0:X}`, `{1:X8}` -> `{1:08X}`.
 
+        The index is KEPT: C# reuses and reorders them (`{0} .. {1} (0x{1:X})`),
+        and dropping it turns a reused index into an argument-count error.
         Passing the C# form through is a compile ERROR, not a wrong string:
         rustc reports `invalid format string: expected }, found 8`."""
         spec = self.language.get("format_strings", {})
         table = spec.get("specs", {})
 
         def one(m):
+            idx = m.group(1)
             fmt = m.group(2) or ""
             if not fmt:
-                return "{}"
+                return "{" + idx + "}"
             kind, digits = fmt[0], fmt[1:]
             mapped = table.get(kind, kind)
             if digits.isdigit() and mapped:
-                return "{:" + spec.get("padded_hex", "0{width}{spec}").format(
+                return "{" + idx + ":" + spec.get("padded_hex", "0{width}{spec}").format(
                     width=digits, spec=mapped) + "}"
-            return "{:" + mapped + "}" if mapped else "{}"
+            return "{" + idx + ":" + mapped + "}" if mapped else "{" + idx + "}"
 
         return re.sub(r"\{(\d+)(?::([^}]*))?\}", one, text)
 

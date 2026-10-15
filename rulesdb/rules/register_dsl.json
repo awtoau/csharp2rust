@@ -718,7 +718,7 @@
   },
   "logging": {
     "note": "Renode's `this.Log(LogLevel.X, format, args...)`. A STATIC extension on IEmulationElement, so argument 0 is the peripheral and argument 1 the level -- binding from the front would log at level `self`. Kept out of `expressions` because it needs the level argument decoded, which a flat template cannot express.",
-    "symbol_contains": "Logging.Logger.Log(",
+    "symbol_contains": "Logging.Logger.Log(Antmicro.Renode.IEmulationElement,",
     "emit": "log::{level}!({args})",
     "default_level": "info",
     "levels": {

@@ -15,6 +15,19 @@ from emitter.core import snake
 PRIORITY = core.LANGUAGE + 5
 
 
+def _last_segment(text: str) -> str:
+    """Text after the last `.` outside `<...>` (a type argument may be dotted)."""
+    depth, start = 0, 0
+    for i, ch in enumerate(text):
+        if ch == "<":
+            depth += 1
+        elif ch == ">":
+            depth -= 1
+        elif ch == "." and depth == 0:
+            start = i + 1
+    return text[start:]
+
+
 @core.expr("Invocation", priority=PRIORITY)
 def invocation(em, oid):
     """Declines when the corpus recorded no symbol for the call.
@@ -34,7 +47,15 @@ def invocation(em, oid):
     # Generic call. Project rules were tried above, so reaching here
     # means no idiom claimed it.
     inv = em.language.get("invocations", {})
-    method = snake(symbol.split("(")[0].split(".")[-1])
+    callee_text = symbol.split("(")[0]
+    if _last_segment(callee_text) != _last_segment(callee_text).split("<")[0]:
+        # Explicit type arguments (`Get<T>()`) have no mapping; `a.get<t>()` is
+        # a chained comparison in Rust. Withhold rather than drop the argument.
+        em.unhandled["expr:GenericMethodCall"] = (
+            em.unhandled.get("expr:GenericMethodCall", 0) + 1)
+        em.gaps.append(f"generic method call `{callee_text}` has no type-argument mapping")
+        return "/* GenericMethodCall */"
+    method = snake(_last_segment(callee_text))
     rendered_args = [em.emit_expr(a[0]) for a in args]
     # Preserve ref/out at call boundaries too.  Roslyn's invocation symbol is
     # the same key stored for an in-corpus member, so this is semantic lookup,

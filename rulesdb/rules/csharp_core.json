@@ -534,8 +534,7 @@
     }
   },
   "format_strings": {
-    "note": "C# composite formatting is NOT Rust format syntax. `{0:X}` is positional-plus-spec; Rust wants `{:X}`. Worse, C# `{1:X8}` means hex padded to 8 -- Rust spells that `{:08X}`, and passing the C# form through is a compile error (`invalid format string: expected }, found 8`), not a wrong string.",
-    "strip_index": true,
+    "note": "C# composite formatting is NOT Rust format syntax. `{0:X}` keeps its index in Rust (`{0:X}`): C# reuses and reorders indexes. Worse, C# `{1:X8}` means hex padded to 8 -- Rust spells that `{:08X}`, and passing the C# form through is a compile error (`invalid format string: expected }, found 8`), not a wrong string.",
     "specs": {
       "X": "X",
       "x": "x",

@@ -1132,6 +1132,11 @@ class Emitter(OffsetSwitchRegisters, RegisterDsl, RenodeExpressions, Expressions
             if method_name.startswith(pre):
                 method_name = method_name[len(pre):]
                 break
+        # Explicit interface impl (`Ns.IFoo.Bar`): keep the interface so two
+        # impls of one method name (ISPI and II2C `FinishTransmission`) differ,
+        # matching the `{base}_{name}` qualified-call form.
+        if "." in method_name:
+            method_name = "_".join(method_name.split(".")[-2:])
         return snake(method_name)
 
     @_core_must_explain
