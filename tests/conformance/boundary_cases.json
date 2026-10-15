@@ -9,5 +9,11 @@
       "thrown": "System.ArgumentException",
       "caught": "System.Exception"
     }
+  ],
+  "unmatched_catch_exception_types": [
+    {
+      "thrown": "System.ArgumentException",
+      "caught": "System.InvalidOperationException"
+    }
   ]
 }

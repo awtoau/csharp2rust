@@ -85,6 +85,10 @@ def main() -> int:
         (OUT / f"CatchBase_{index}.cs").write_text(
             caught_throwing_program(
                 f"CatchBase_{index}", case["thrown"], case["caught"]))
+    for index, case in enumerate(catalog["unmatched_catch_exception_types"]):
+        (OUT / f"CatchUnmatched_{index}.cs").write_text(
+            caught_throwing_program(
+                f"CatchUnmatched_{index}", case["thrown"], case["caught"]))
     print(f"generated {len(cases)} C# conformance input program(s) in {OUT}")
     return 0
 
