@@ -140,6 +140,8 @@ scripts alone". Saying it was not enough, so it is now checked.
 
 ### Enforced
 
+- Hooks only run after `python3 scripts/dev.py install-hooks` (sets
+  `core.hooksPath`); a fresh clone has none. STATUS.md reports whether installed.
 - `scripts/check_generated.py` (pre-commit, hard failure): a file listed as
   generated must be byte-identical to converter output. Hand-editing one fails
   the commit.

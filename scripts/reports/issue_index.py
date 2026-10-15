@@ -18,7 +18,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = "awtoau/awto-renode-rs"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
+from repo_slug import repo_slug  # noqa: E402
+
+REPO = repo_slug()
 
 
 def main() -> int:

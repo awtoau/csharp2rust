@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical development entry point for awto-renode-rs.
+"""Canonical development entry point for this repo.
 
 Agents: ``python3 scripts/dev.py describe`` emits machine-readable help.
 Humans: ``python3 scripts/dev.py --help`` lists the same registry.
@@ -18,8 +18,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-PROJECT = "awto-renode-rs"
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts" / "core"))
+from repo_slug import repo_name  # noqa: E402
+
+PROJECT = repo_name()
 LOG = REPO / "tmp" / "logs" / "dev.log"
 SKIPPED = 125
 
@@ -150,6 +153,11 @@ def cmd_selftest(_extra: list[str]) -> int:
 def cmd_build(extra: list[str]) -> int:
     return run([sys.executable, "scripts/validation/compile_check.py",
                 "--working-set", "--ratchet", *extra])
+
+
+@command("point git at scripts/githooks so the pre-commit gates run", kind="action")
+def cmd_install_hooks(_extra: list[str]) -> int:
+    return run(["git", "config", "core.hooksPath", "scripts/githooks"])
 
 
 @command("regenerate every converter-owned output", kind="action")
