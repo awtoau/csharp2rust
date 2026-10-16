@@ -25,7 +25,23 @@ class RenodeExpressions:
     """Mixin: corpus-specific expression handlers, tried before the language."""
 
     @staticmethod
-    def _log_message_args(rest: list[str]) -> list[str]:
+    def _has_format_placeholder(text: str) -> bool:
+        """Whether an emitted Rust string literal has a real format field."""
+        pos = 0
+        while pos < len(text):
+            if text[pos] == "{":
+                if pos + 1 < len(text) and text[pos + 1] == "{":
+                    pos += 2
+                    continue
+                return True
+            if text[pos] == "}" and pos + 1 < len(text) and text[pos + 1] == "}":
+                pos += 2
+                continue
+            pos += 1
+        return False
+
+    @classmethod
+    def _log_message_args(cls, rest: list[str]) -> list[str]:
         """Renode's message argument is a C# string, but not always a Rust
         string LITERAL: an interpolated string arrives as `format!(..)` (unwrap
         it, its own literal+args pass straight through) while a plain
@@ -36,6 +52,8 @@ class RenodeExpressions:
             return [rest[0][len("format!("):-1]]
         if rest and not rest[0].startswith('"'):
             return [f'"{{}}", {rest[0]}', *rest[1:]]
+        if rest and rest[0].endswith('"') and not cls._has_format_placeholder(rest[0][1:-1]):
+            return [rest[0]]
         return rest
 
     def plugin_expr(self, oid, kind, symbol, const, rtype, detail, kids, args, all_kids):
