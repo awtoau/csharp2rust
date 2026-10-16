@@ -1,6 +1,6 @@
 # renode-rs — scorecard
 
-Generated 2026-10-15T19:31:42+11:00 from `6df3437` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
+Generated 2026-10-16T13:57:15+11:00 from `ea6d9b2` by `scripts/reports/scorecard.py`. **Do not edit by hand.**
 
 Leading with the metrics that detect drift, not the ones that flatter it —
 "files translated" is exactly what looked healthy in `linux-rs` while its rules
@@ -236,17 +236,32 @@ hybrid host was ~50% from core migration; pinned it is ±2%.
 
 ## Issues
 
-38 open, 47 closed, 85 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
+70 open, 47 closed, 117 total. Full list: [github.com/awtoau/csharp2rust/issues](https://github.com/awtoau/csharp2rust/issues).
 
 | phase | open | closed |
 |---|---:|---:|
-| unphased | 38 | 47 |
+| unphased | 70 | 47 |
 
 **By label** (an issue may carry more than one; counts are not additive to the total above):
 
 | label | issues |
 |---|---:|
 | `bug` | 3 — [#66](https://github.com/awtoau/csharp2rust/issues/66), [#71](https://github.com/awtoau/csharp2rust/issues/71), [#77](https://github.com/awtoau/csharp2rust/issues/77) |
+| `classification:corpus-variant` | 1 — [#124](https://github.com/awtoau/csharp2rust/issues/124) |
+| `classification:local-ai` | 2 — [#119](https://github.com/awtoau/csharp2rust/issues/119), [#121](https://github.com/awtoau/csharp2rust/issues/121) |
+| `classification:maintenance` | 2 — [#111](https://github.com/awtoau/csharp2rust/issues/111), [#115](https://github.com/awtoau/csharp2rust/issues/115) |
+| `classification:runtime` | 1 — [#123](https://github.com/awtoau/csharp2rust/issues/123) |
+| `classification:tooling` | 4 — [#116](https://github.com/awtoau/csharp2rust/issues/116), [#117](https://github.com/awtoau/csharp2rust/issues/117), [#118](https://github.com/awtoau/csharp2rust/issues/118), [#122](https://github.com/awtoau/csharp2rust/issues/122) |
+| `classification:validation` | 1 — [#120](https://github.com/awtoau/csharp2rust/issues/120) |
+| `dialect:unresolved` | 7 — [#97](https://github.com/awtoau/csharp2rust/issues/97), [#105](https://github.com/awtoau/csharp2rust/issues/105), [#106](https://github.com/awtoau/csharp2rust/issues/106), [#107](https://github.com/awtoau/csharp2rust/issues/107), [#108](https://github.com/awtoau/csharp2rust/issues/108), [#109](https://github.com/awtoau/csharp2rust/issues/109), [#110](https://github.com/awtoau/csharp2rust/issues/110) |
+| `frontend:roslyn` | 11 — [#96](https://github.com/awtoau/csharp2rust/issues/96), [#99](https://github.com/awtoau/csharp2rust/issues/99), [#100](https://github.com/awtoau/csharp2rust/issues/100), [#101](https://github.com/awtoau/csharp2rust/issues/101), [#102](https://github.com/awtoau/csharp2rust/issues/102), [#103](https://github.com/awtoau/csharp2rust/issues/103), [#104](https://github.com/awtoau/csharp2rust/issues/104), [#112](https://github.com/awtoau/csharp2rust/issues/112), [#113](https://github.com/awtoau/csharp2rust/issues/113), [#114](https://github.com/awtoau/csharp2rust/issues/114), [#115](https://github.com/awtoau/csharp2rust/issues/115) |
+| `language:c` | 1 — [#124](https://github.com/awtoau/csharp2rust/issues/124) |
+| `language:csharp` | 11 — [#96](https://github.com/awtoau/csharp2rust/issues/96), [#99](https://github.com/awtoau/csharp2rust/issues/99), [#100](https://github.com/awtoau/csharp2rust/issues/100), [#101](https://github.com/awtoau/csharp2rust/issues/101), [#102](https://github.com/awtoau/csharp2rust/issues/102), [#103](https://github.com/awtoau/csharp2rust/issues/103), [#104](https://github.com/awtoau/csharp2rust/issues/104), [#112](https://github.com/awtoau/csharp2rust/issues/112), [#113](https://github.com/awtoau/csharp2rust/issues/113), [#114](https://github.com/awtoau/csharp2rust/issues/114), [#115](https://github.com/awtoau/csharp2rust/issues/115) |
+| `language:delphi` | 9 — [#97](https://github.com/awtoau/csharp2rust/issues/97), [#105](https://github.com/awtoau/csharp2rust/issues/105), [#106](https://github.com/awtoau/csharp2rust/issues/106), [#107](https://github.com/awtoau/csharp2rust/issues/107), [#108](https://github.com/awtoau/csharp2rust/issues/108), [#109](https://github.com/awtoau/csharp2rust/issues/109), [#110](https://github.com/awtoau/csharp2rust/issues/110), [#119](https://github.com/awtoau/csharp2rust/issues/119), [#123](https://github.com/awtoau/csharp2rust/issues/123) |
+| `language:shared` | 7 — [#111](https://github.com/awtoau/csharp2rust/issues/111), [#116](https://github.com/awtoau/csharp2rust/issues/116), [#117](https://github.com/awtoau/csharp2rust/issues/117), [#118](https://github.com/awtoau/csharp2rust/issues/118), [#120](https://github.com/awtoau/csharp2rust/issues/120), [#121](https://github.com/awtoau/csharp2rust/issues/121), [#122](https://github.com/awtoau/csharp2rust/issues/122) |
+| `priority:p0` | 4 — [#116](https://github.com/awtoau/csharp2rust/issues/116), [#120](https://github.com/awtoau/csharp2rust/issues/120), [#121](https://github.com/awtoau/csharp2rust/issues/121), [#122](https://github.com/awtoau/csharp2rust/issues/122) |
+| `priority:p1` | 6 — [#117](https://github.com/awtoau/csharp2rust/issues/117), [#118](https://github.com/awtoau/csharp2rust/issues/118), [#121](https://github.com/awtoau/csharp2rust/issues/121), [#122](https://github.com/awtoau/csharp2rust/issues/122), [#123](https://github.com/awtoau/csharp2rust/issues/123), [#124](https://github.com/awtoau/csharp2rust/issues/124) |
+| `stage:basic-feature` | 18 — [#96](https://github.com/awtoau/csharp2rust/issues/96), [#97](https://github.com/awtoau/csharp2rust/issues/97), [#99](https://github.com/awtoau/csharp2rust/issues/99), [#100](https://github.com/awtoau/csharp2rust/issues/100), [#101](https://github.com/awtoau/csharp2rust/issues/101), [#102](https://github.com/awtoau/csharp2rust/issues/102), [#103](https://github.com/awtoau/csharp2rust/issues/103), [#104](https://github.com/awtoau/csharp2rust/issues/104), [#105](https://github.com/awtoau/csharp2rust/issues/105), [#106](https://github.com/awtoau/csharp2rust/issues/106), [#107](https://github.com/awtoau/csharp2rust/issues/107), [#108](https://github.com/awtoau/csharp2rust/issues/108), +6 more |
 | `triage:done` | 20 — [#4](https://github.com/awtoau/csharp2rust/issues/4), [#5](https://github.com/awtoau/csharp2rust/issues/5), [#8](https://github.com/awtoau/csharp2rust/issues/8), [#10](https://github.com/awtoau/csharp2rust/issues/10), [#11](https://github.com/awtoau/csharp2rust/issues/11), [#12](https://github.com/awtoau/csharp2rust/issues/12), [#13](https://github.com/awtoau/csharp2rust/issues/13), [#14](https://github.com/awtoau/csharp2rust/issues/14), [#16](https://github.com/awtoau/csharp2rust/issues/16), [#32](https://github.com/awtoau/csharp2rust/issues/32), [#33](https://github.com/awtoau/csharp2rust/issues/33), [#38](https://github.com/awtoau/csharp2rust/issues/38), +8 more |
 | `triage:still-valid` | 32 — [#3](https://github.com/awtoau/csharp2rust/issues/3), [#6](https://github.com/awtoau/csharp2rust/issues/6), [#7](https://github.com/awtoau/csharp2rust/issues/7), [#9](https://github.com/awtoau/csharp2rust/issues/9), [#20](https://github.com/awtoau/csharp2rust/issues/20), [#21](https://github.com/awtoau/csharp2rust/issues/21), [#22](https://github.com/awtoau/csharp2rust/issues/22), [#23](https://github.com/awtoau/csharp2rust/issues/23), [#24](https://github.com/awtoau/csharp2rust/issues/24), [#25](https://github.com/awtoau/csharp2rust/issues/25), [#26](https://github.com/awtoau/csharp2rust/issues/26), [#27](https://github.com/awtoau/csharp2rust/issues/27), +20 more |
 | `triage:superseded` | 9 — [#15](https://github.com/awtoau/csharp2rust/issues/15), [#17](https://github.com/awtoau/csharp2rust/issues/17), [#18](https://github.com/awtoau/csharp2rust/issues/18), [#19](https://github.com/awtoau/csharp2rust/issues/19), [#29](https://github.com/awtoau/csharp2rust/issues/29), [#34](https://github.com/awtoau/csharp2rust/issues/34), [#35](https://github.com/awtoau/csharp2rust/issues/35), [#37](https://github.com/awtoau/csharp2rust/issues/37), [#53](https://github.com/awtoau/csharp2rust/issues/53) |
