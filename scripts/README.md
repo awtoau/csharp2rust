@@ -11,7 +11,8 @@ classifier: `core/` (converter and shared library modules), `validation/`
 `analysis/` (census and other reproducible-research scripts), `oracle/`
 (trace acquisition and replay tooling), `reports/` (generated status output).
 A handful of top-level entry points (`dev.py`, `gates.py`, `regenerate.py`,
-`dispatch_spike.py`, `record_translations.py`, `dump_emitted.py`, `rules.py`)
+`dispatch_spike.py`, `record_translations.py`, `dump_emitted.py`, `rules.py`,
+`sync_renode.py`)
 don't fit one category and stay at `scripts/` directly. `dev.py describe`
 discovers commands from every one of these directories, so a script's kind on
 the CLI and its physical directory can differ (`check_generated.py` lives in
@@ -35,6 +36,14 @@ by kind).
 - `dev.py ci-fast`: full push-tier (`--full`) run with fail-fast enabled.
 - `dev.py ci-determinism`: explicit issue-36 determinism proof run
   (`check_determinism.py` then `check_emit_determinism.py`).
+- `sync_renode.py` (`dev.py sync-renode --tag vX.Y.Z`): creates or verifies a
+  release-pinned Renode worktree in `tmp/`, then ingests and checks a scratch
+  corpus. It never overwrites `rulesdb/patterns.db`; review it with
+  `dev.py diff-corpus --new tmp/patterns-vX.Y.Z.db`. `--activate` changes the
+  local `RENODE_SRC` only after the scratch corpus passes health checks.
+- `promote_corpus.py` (`dev.py promote-corpus --from-db tmp/patterns-vX.Y.Z.db`):
+  atomically replaces the canonical corpus only after verifying the supplied
+  scratch database is a populated whole-tree ingest.
 
 ## Validation (`validation/`)
 
@@ -77,6 +86,21 @@ and decision documents. They are analysis commands, not everyday gates.
 ## Inspection tools
 
 - `dump_emitted.py`: write emitted modules under `tmp/out/` for human review.
+- `dev.py describe-schema --db PATH`: describe an explicitly supplied corpus
+  SQLite database without reading source files or executing corpus queries.
+  JSON is the stable agent contract; `--format text` is the compact
+  human-readable view. It opens the database read-only and exposes only schema
+  metadata: tables, columns, keys, indexes, triggers, views, and foreign-key
+  relationship summaries. It deliberately has no SQL or mutation argument.
+- `dev.py list-recipes`: publish the versioned, read-only semantic-query
+  registry, including each recipe's inputs, output columns, intent, and
+  referenced tables.
+- `dev.py query-recipe --db PATH --recipe NAME`: run one listed recipe with
+  validated parameters and a bounded result limit. The initial recipes expose
+  exact operation kinds and symbols, `NotImplementedException` throws, method
+  shapes, local register builders, and cluster members. Every result carries
+  stable corpus, source, member, method, operation, and source-span
+  provenance. It accepts no SQL or mutation input.
 
 ## Historical debris
 

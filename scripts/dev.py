@@ -91,6 +91,32 @@ def cmd_describe(_extra: list[str]) -> int:
     return 0
 
 
+@command(
+    "describe a corpus SQLite schema through a read-only contract",
+    args="--db PATH [--format json|text]",
+    kind="analysis",
+)
+def cmd_describe_schema(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/describe_schema.py", *extra])
+
+
+@command(
+    "list versioned read-only corpus semantic-query recipes",
+    kind="analysis",
+)
+def cmd_list_recipes(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/corpus_recipes.py", "list", *extra])
+
+
+@command(
+    "run one versioned read-only corpus semantic-query recipe",
+    args="--db PATH --recipe NAME [recipe input] [--limit N]",
+    kind="analysis",
+)
+def cmd_query_recipe(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/corpus_recipes.py", "query", *extra])
+
+
 @command("check required development tools and shared awto-dan rules", kind="meta")
 def cmd_doctor(_extra: list[str]) -> int:
     missing = [tool for tool in ("cargo", "git", "gh", "codex") if not shutil.which(tool)]
@@ -168,6 +194,12 @@ def cmd_regenerate(extra: list[str]) -> int:
 @command("run the Rust workspace test suite", kind="step")
 def cmd_test(extra: list[str]) -> int:
     return run(["cargo", "test", "--workspace", *extra])
+
+
+@command("pin a Renode release and ingest a verified scratch corpus (issue #80)",
+         kind="action")
+def cmd_sync_renode(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/sync_renode.py", *extra])
 
 
 @command("run the fail-fast everyday validation tier", kind="aggregate")

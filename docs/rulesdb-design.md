@@ -6,6 +6,40 @@ requires the whole corpus in a queryable database *before* translation starts.
 
 Schema and the discipline that enforces it.
 
+## Read-only schema contract
+
+Tools and proposal workers discover the corpus shape through the supported
+entry point rather than recreating partial joins from memory:
+
+```text
+python3 scripts/dev.py describe-schema --db PATH
+```
+
+`PATH` is required. The command opens it using SQLite read-only mode and emits
+deterministic JSON containing the schema version and hash, tables and columns,
+primary and foreign keys, indexes, triggers, views, and foreign-key
+relationship summaries. `--format text` provides a compact human view. It
+does not accept SQL, query expressions, or mutation inputs.
+
+Schema discovery is paired with a small, named semantic-query registry:
+
+```text
+python3 scripts/dev.py list-recipes
+python3 scripts/dev.py query-recipe --db PATH --recipe NAME [recipe input]
+```
+
+The list is a versioned JSON contract naming each recipe's validated inputs,
+output columns, semantic intent, and referenced tables. Query results are
+deterministically ordered, bounded by `--limit`, and include corpus-run, path,
+containing type/member/method, operation, and source-span provenance. The
+initial registry is deliberately small: operation kind and symbol, a precise
+`NotImplementedException` throw shape, method shape, local register builder,
+and cluster members.
+
+Neither command accepts SQL, expressions, nor mutation inputs. A worker must
+use one of these published recipes rather than inventing an interactive join;
+the registry grows only when a measured workflow needs another semantic fact.
+
 ## The lesson this is designed around
 
 `linux-rs` ran two tracks in the same period. Measured from its `patterns.db`,

@@ -1,0 +1,46 @@
+{
+  "elapsed_seconds": 4.158531851993757,
+  "input": {
+    "constructor_symbol": "System.NotImplementedException.NotImplementedException()",
+    "exception_base_type": "System.Exception",
+    "method_signature": "Antmicro.Renode.Core.GPIOGate.IrqNode.Disconnect(Antmicro.Renode.Core.GPIOEndpoint)",
+    "source_path": "src/Infrastructure/src/Emulator/Main/Core/GPIOGate.cs",
+    "span_len": 36,
+    "span_start": 1625
+  },
+  "model": {
+    "digest": "9ec8897f747e246e970bc5cfdda85d22f1123dc2e3d34978a010a75968716849",
+    "name": "qwen2.5-coder:14b"
+  },
+  "proposal": {
+    "constructor_symbol": "System.NotImplementedException.NotImplementedException()",
+    "exception_base_type": "System.Exception",
+    "method_signature": "Antmicro.Renode.Core.GPIOGate.IrqNode.Disconnect(Antmicro.Renode.Core.GPIOEndpoint)",
+    "open_question": "What is the purpose of throwing a NotImplementedException in this method?",
+    "recommendation": "research_rust_panic_mapping",
+    "source_path": "src/Infrastructure/src/Emulator/Main/Core/GPIOGate.cs",
+    "span_len": 36,
+    "span_start": 1625,
+    "status_claim": "unvalidated-llm-proposal"
+  },
+  "raw_response": {
+    "created_at": "2026-10-16T02:53:28.968753476Z",
+    "done": true,
+    "done_reason": "stop",
+    "eval_count": 152,
+    "eval_duration": 4060111000,
+    "load_duration": 1233754,
+    "message": {
+      "content": "{\n  \"constructor_symbol\": \"System.NotImplementedException.NotImplementedException()\",\n  \"exception_base_type\": \"System.Exception\",\n  \"method_signature\": \"Antmicro.Renode.Core.GPIOGate.IrqNode.Disconnect(Antmicro.Renode.Core.GPIOEndpoint)\",\n  \"open_question\": \"What is the purpose of throwing a NotImplementedException in this method?\",\n  \"recommendation\": \"research_rust_panic_mapping\",\n  \"source_path\": \"src/Infrastructure/src/Emulator/Main/Core/GPIOGate.cs\",\n  \"span_len\": 36,\n  \"span_start\": 1625,\n  \"status_claim\": \"unvalidated-llm-proposal\"\n}",
+      "role": "assistant"
+    },
+    "model": "qwen2.5-coder:14b",
+    "prompt_eval_cached_count": 138,
+    "prompt_eval_count": 214,
+    "prompt_eval_duration": 56673000,
+    "total_duration": 4157654193
+  },
+  "sequence": 3,
+  "status": "unvalidated-llm-proposal",
+  "worker_session_id": "f4aad746273b5aa716cf758e92492c98ae33ede84d7ffdfac98ac1c297ff8fe4"
+}
