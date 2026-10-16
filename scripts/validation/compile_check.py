@@ -98,6 +98,19 @@ def module_name(type_name: str) -> str:
     return _module_name(type_name)
 
 
+def error_group_key(diagnostic: dict[str, object]) -> str:
+    """Return a stable work-item key for one rustc error diagnostic."""
+    code = diagnostic.get("code")
+    if isinstance(code, dict):
+        value = code.get("code")
+        if isinstance(value, str) and value:
+            return value
+    message = diagnostic.get("message")
+    if isinstance(message, str) and message:
+        return f"no-code: {message}"
+    return "no-code: missing diagnostic message"
+
+
 def load_clean_set(root: Path, log: logging.Logger) -> set[str] | None:
     """The declared set of modules that MUST compile clean. None if unusable.
 
@@ -392,7 +405,7 @@ def main() -> int:
         if d.get("level") != "error":
             continue
         total += 1
-        code = (d.get("code") or {}).get("code") or "no-code"
+        code = error_group_key(d)
         codes[code] += 1
         examples.setdefault(code, (d.get("message") or "")[:88])
         for span in d.get("spans", []):
