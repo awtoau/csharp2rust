@@ -100,6 +100,23 @@ def cmd_describe_schema(extra: list[str]) -> int:
     return run([sys.executable, "scripts/analysis/describe_schema.py", *extra])
 
 
+@command(
+    "list versioned read-only corpus semantic-query recipes",
+    kind="analysis",
+)
+def cmd_list_recipes(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/corpus_recipes.py", "list", *extra])
+
+
+@command(
+    "run one versioned read-only corpus semantic-query recipe",
+    args="--db PATH --recipe NAME [recipe input] [--limit N]",
+    kind="analysis",
+)
+def cmd_query_recipe(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/corpus_recipes.py", "query", *extra])
+
+
 @command("check required development tools and shared awto-dan rules", kind="meta")
 def cmd_doctor(_extra: list[str]) -> int:
     missing = [tool for tool in ("cargo", "git", "gh", "codex") if not shutil.which(tool)]

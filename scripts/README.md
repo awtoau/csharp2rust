@@ -92,6 +92,15 @@ and decision documents. They are analysis commands, not everyday gates.
   human-readable view. It opens the database read-only and exposes only schema
   metadata: tables, columns, keys, indexes, triggers, views, and foreign-key
   relationship summaries. It deliberately has no SQL or mutation argument.
+- `dev.py list-recipes`: publish the versioned, read-only semantic-query
+  registry, including each recipe's inputs, output columns, intent, and
+  referenced tables.
+- `dev.py query-recipe --db PATH --recipe NAME`: run one listed recipe with
+  validated parameters and a bounded result limit. The initial recipes expose
+  exact operation kinds and symbols, `NotImplementedException` throws, method
+  shapes, local register builders, and cluster members. Every result carries
+  stable corpus, source, member, method, operation, and source-span
+  provenance. It accepts no SQL or mutation input.
 
 ## Historical debris
 
