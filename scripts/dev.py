@@ -91,6 +91,15 @@ def cmd_describe(_extra: list[str]) -> int:
     return 0
 
 
+@command(
+    "describe a corpus SQLite schema through a read-only contract",
+    args="--db PATH [--format json|text]",
+    kind="analysis",
+)
+def cmd_describe_schema(extra: list[str]) -> int:
+    return run([sys.executable, "scripts/analysis/describe_schema.py", *extra])
+
+
 @command("check required development tools and shared awto-dan rules", kind="meta")
 def cmd_doctor(_extra: list[str]) -> int:
     missing = [tool for tool in ("cargo", "git", "gh", "codex") if not shutil.which(tool)]

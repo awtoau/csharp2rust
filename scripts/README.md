@@ -86,6 +86,12 @@ and decision documents. They are analysis commands, not everyday gates.
 ## Inspection tools
 
 - `dump_emitted.py`: write emitted modules under `tmp/out/` for human review.
+- `dev.py describe-schema --db PATH`: describe an explicitly supplied corpus
+  SQLite database without reading source files or executing corpus queries.
+  JSON is the stable agent contract; `--format text` is the compact
+  human-readable view. It opens the database read-only and exposes only schema
+  metadata: tables, columns, keys, indexes, triggers, views, and foreign-key
+  relationship summaries. It deliberately has no SQL or mutation argument.
 
 ## Historical debris
 

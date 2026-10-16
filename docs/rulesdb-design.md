@@ -6,6 +6,25 @@ requires the whole corpus in a queryable database *before* translation starts.
 
 Schema and the discipline that enforces it.
 
+## Read-only schema contract
+
+Tools and proposal workers discover the corpus shape through the supported
+entry point rather than recreating partial joins from memory:
+
+```text
+python3 scripts/dev.py describe-schema --db PATH
+```
+
+`PATH` is required. The command opens it using SQLite read-only mode and emits
+deterministic JSON containing the schema version and hash, tables and columns,
+primary and foreign keys, indexes, triggers, views, and foreign-key
+relationship summaries. `--format text` provides a compact human view. It
+does not accept SQL, query expressions, or mutation inputs.
+
+This is deliberately only schema discovery. Named, bounded corpus recipes are
+the next slice; until they exist, a worker must not treat the schema command as
+permission to invent an interactive query interface.
+
 ## The lesson this is designed around
 
 `linux-rs` ran two tracks in the same period. Measured from its `patterns.db`,
