@@ -8,12 +8,14 @@ from dataclasses import asdict, dataclass
 import hashlib
 import json
 from pathlib import Path
-import sqlite3
 import sys
 import time
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+from analysis.corpus_recipes import RECIPE_BY_NAME, open_read_only
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,39 +70,26 @@ def resolve_model(base_url: str) -> ModelIdentity:
 
 
 def entries(database: Path, limit: int) -> list[dict[str, Any]]:
-    connection = sqlite3.connect(f"file:{database.resolve()}?mode=ro", uri=True)
-    try:
-        rows = connection.execute(
-            """
-            SELECT f.path, m.signature, th.span_start, th.span_len,
-                   cv.type AS exception_base_type, oc.symbol AS constructor_symbol
-            FROM operation th
-            JOIN operation cv ON cv.parent_id = th.id AND cv.kind = 'Conversion'
-            JOIN operation oc ON oc.parent_id = cv.id AND oc.kind = 'ObjectCreation'
-            JOIN method m ON m.member_id = th.method_id
-            JOIN member mb ON mb.id = m.member_id
-            JOIN type t ON t.id = mb.type_id
-            JOIN file f ON f.id = t.file_id
-            WHERE th.kind = 'Throw'
-              AND oc.symbol = 'System.NotImplementedException.NotImplementedException()'
-            ORDER BY f.path, m.signature, th.ordinal
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
-    finally:
-        connection.close()
+    recipe = RECIPE_BY_NAME["throw-not-implemented"]
+    with open_read_only(str(database)) as connection:
+        rows = recipe.query(connection, SimpleNamespace(limit=limit))
     if len(rows) < limit:
         raise ValueError(f"only {len(rows)} matching throw facts are available")
     fields = (
+        "corpus_run_id",
+        "corpus_commit",
+        "corpus_tool_version",
         "source_path",
+        "containing_type",
         "method_signature",
+        "operation_id",
         "span_start",
         "span_len",
+        "operation_kind",
         "exception_base_type",
         "constructor_symbol",
     )
-    return [dict(zip(fields, row)) for row in rows]
+    return [{field: row[field] for field in fields} for row in rows]
 
 
 def payload(entry: dict[str, Any]) -> dict[str, Any]:
@@ -259,6 +248,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, sqlite3.Error, json.JSONDecodeError) as error:
+    except (OSError, ValueError, json.JSONDecodeError) as error:
         print(error, file=sys.stderr)
         raise SystemExit(1)
