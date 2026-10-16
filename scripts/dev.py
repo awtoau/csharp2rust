@@ -177,8 +177,12 @@ def cmd_selftest(_extra: list[str]) -> int:
 
 @command("compile the known-clean set plus types touched by the diff", kind="step")
 def cmd_build(extra: list[str]) -> int:
+    full = "--full" in extra
+    if full:
+        extra = [argument for argument in extra if argument != "--full"]
     return run([sys.executable, "scripts/validation/compile_check.py",
-                "--working-set", "--ratchet", *extra])
+                *(("--ratchet",) if full else ("--working-set", "--ratchet")),
+                *extra])
 
 
 @command("point git at scripts/githooks so the pre-commit gates run", kind="action")
